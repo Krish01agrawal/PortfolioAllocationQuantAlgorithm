@@ -1,0 +1,333 @@
+# Portfolio Allocation Context
+
+## Allocation Matrix Structure
+
+**Input Dimensions**: Risk Profile × SIP Bucket  
+**Output**: % per category + # of funds per category  
+
+### 4 Risk Profiles
+1. **Safety Seeker**: Capital preservation, low volatility
+2. **Conservative Guardian**: Cautious growth, balanced
+3. **Balanced Achiever**: Moderate risk-return
+4. **Aggressive Explorer**: High growth, equity-heavy
+
+### 6 SIP Buckets
+1. **Micro**: ₹1 - ₹4,999
+2. **Ultra-Small**: ₹5,000 - ₹9,999
+3. **Small**: ₹10,000 - ₹19,999
+4. **Moderate**: ₹20,000 - ₹34,999
+5. **High**: ₹35,000 - ₹49,999
+6. **Ultra-High**: ₹50,000+
+
+### 12 Fund Categories
+```javascript
+[
+  "Large Cap",
+  "Mid Cap",
+  "Small Cap",
+  "Flexi-Cap / MultiCap",
+  "Index / ETF",
+  "International",
+  "Hybrid – Conservative",
+  "Hybrid – Equity-Oriented",
+  "Debt – Corporate",
+  "Debt – Short/Ultra Short",
+  "Debt – Banking / PSU",
+  "Debt – Gilt"
+]
+```
+
+## Key Principles
+
+### 1. Diversification by SIP Size
+**Micro SIPs** (₹1-4,999):
+- Fewer funds (1-2 total) to meet minimums
+- Simpler portfolios
+
+**Ultra-High SIPs** (₹50,000+):
+- More funds (7-10 total) for diversification
+- Broader category coverage
+
+### 2. Risk Alignment
+**Safety Seeker** portfolios:
+- 70-100% Debt/Hybrid
+- 0-30% Equity (only Large Cap, no Small Cap)
+
+**Aggressive Explorer** portfolios:
+- 80-100% Equity
+- Includes Small Cap, Mid Cap, International
+- Minimal Debt (10-20% for stability)
+
+### 3. Sum Constraints
+For each (Risk Profile, SIP Bucket) combination:
+- **Percentages MUST sum to 100%** (1.0)
+- **Number of schemes** determines how many funds to pick per category
+
+## Example Lookups
+
+### Example 1: Safety Seeker + Micro
+```json
+{
+  "Hybrid – Conservative": { "percentage": 1.0, "num_schemes": 1 }
+}
+```
+**Interpretation**: 100% allocation to 1 Hybrid Conservative fund (simplest portfolio)
+
+---
+
+### Example 2: Balanced Achiever + Moderate
+```json
+{
+  "Large Cap": { "percentage": 0.20, "num_schemes": 1 },
+  "Mid Cap": { "percentage": 0.15, "num_schemes": 1 },
+  "Small Cap": { "percentage": 0.10, "num_schemes": 1 },
+  "Flexi-Cap / MultiCap": { "percentage": 0.10, "num_schemes": 1 },
+  "Index / ETF": { "percentage": 0.05, "num_schemes": 1 },
+  "International": { "percentage": 0.05, "num_schemes": 1 },
+  "Hybrid – Equity-Oriented": { "percentage": 0.15, "num_schemes": 1 },
+  "Debt – Corporate": { "percentage": 0.10, "num_schemes": 1 },
+  "Debt – Short/Ultra Short": { "percentage": 0.05, "num_schemes": 1 },
+  "Debt – Banking / PSU": { "percentage": 0.05, "num_schemes": 1 }
+}
+```
+**Interpretation**:
+- SIP = ₹25,000
+- Large Cap: 20% × ₹25,000 = ₹5,000 → Pick 1 fund
+- Mid Cap: 15% × ₹25,000 = ₹3,750 → Pick 1 fund
+- Total: 10 funds
+
+---
+
+### Example 3: Aggressive Explorer + Ultra-High
+```json
+{
+  "Large Cap": { "percentage": 0.20, "num_schemes": 1 },
+  "Mid Cap": { "percentage": 0.20, "num_schemes": 1 },
+  "Small Cap": { "percentage": 0.15, "num_schemes": 1 },
+  "Flexi-Cap / MultiCap": { "percentage": 0.10, "num_schemes": 1 },
+  "Index / ETF": { "percentage": 0.05, "num_schemes": 1 },
+  "International": { "percentage": 0.10, "num_schemes": 1 },
+  "Hybrid – Equity-Oriented": { "percentage": 0.10, "num_schemes": 1 },
+  "Debt – Short/Ultra Short": { "percentage": 0.05, "num_schemes": 1 },
+  "Debt – Banking / PSU": { "percentage": 0.05, "num_schemes": 1 }
+}
+```
+**Interpretation**:
+- SIP = ₹60,000
+- Heavy equity tilt (75% equity)
+- Includes International + Small Cap (higher risk)
+
+## Portfolio Construction Logic
+
+### Step 1: Determine SIP Bucket
+```python
+def get_sip_bucket(monthly_sip: int) -> str:
+    if monthly_sip < 5000:
+        return "Micro"
+    elif monthly_sip < 10000:
+        return "Ultra-Small"
+    elif monthly_sip < 20000:
+        return "Small"
+    elif monthly_sip < 35000:
+        return "Moderate"
+    elif monthly_sip < 50000:
+        return "High"
+    else:
+        return "Ultra-High"
+```
+
+### Step 2: Lookup Allocation
+```python
+# Load allocation matrix
+with open("src/config/allocation_matrix.json") as f:
+    matrix = json.load(f)
+
+# Get allocation for (risk_profile, sip_bucket)
+allocation = matrix[risk_profile][sip_bucket]
+
+# Example result:
+# {
+#   "Large Cap": {"percentage": 0.20, "num_schemes": 1},
+#   "Mid Cap": {"percentage": 0.15, "num_schemes": 1},
+#   ...
+# }
+```
+
+### Step 3: Calculate Per-Category Amounts
+```python
+portfolio = []
+for category, config in allocation.items():
+    category_amount = monthly_sip * config["percentage"]
+    num_schemes = config["num_schemes"]
+    
+    # Get top-ranked funds from Collection 4
+    top_funds = get_top_n_funds(
+        category=category,
+        risk_profile=risk_profile,
+        n=num_schemes,
+        timestamp=latest_month
+    )
+    
+    # Split amount equally within category (default strategy)
+    per_fund_amount = category_amount / num_schemes
+    
+    for fund in top_funds:
+        portfolio.append({
+            "fund_name": fund["fund_name"],
+            "fund_id": fund["fund_id"],
+            "category": category,
+            "sip_amount": per_fund_amount,
+            "composite_score": fund["composite_score"],
+            "rank": fund["rank"]
+        })
+```
+
+### Step 4: Apply Constraints
+
+#### A. SIP Minimum Check
+```python
+for item in portfolio:
+    fund_minimum = get_fund_minimum(item["fund_id"])  # e.g., ₹500
+    
+    if item["sip_amount"] < fund_minimum:
+        # Strategy 1: Round up to minimum
+        deficit = fund_minimum - item["sip_amount"]
+        item["sip_amount"] = fund_minimum
+        
+        # Deduct deficit from highest-allocation fund
+        # (or warn user to increase SIP amount)
+```
+
+#### B. AMC Diversification
+```python
+# Don't pick 2+ funds from same AMC in same category
+amc_counts = defaultdict(int)
+
+for item in portfolio:
+    amc = get_amc(item["fund_id"])
+    
+    if amc_counts[(item["category"], amc)] >= 1:
+        # Replace with next-best fund from different AMC
+        replacement = get_next_best_fund_different_amc(
+            category=item["category"],
+            risk_profile=risk_profile,
+            excluded_amc=amc
+        )
+        item.update(replacement)
+    
+    amc_counts[(item["category"], amc)] += 1
+```
+
+#### C. Rounding & Residuals
+```python
+# Round SIP amounts to nearest ₹100
+for item in portfolio:
+    item["sip_amount"] = round(item["sip_amount"] / 100) * 100
+
+# Allocate residual to top-ranked fund
+total_allocated = sum(item["sip_amount"] for item in portfolio)
+residual = monthly_sip - total_allocated
+
+if residual > 0:
+    portfolio[0]["sip_amount"] += residual  # Top fund gets extra
+```
+
+## Edge Cases
+
+### Case 1: No Eligible Funds in Category
+**Problem**: Allocation says "Mid Cap: 15%", but no Mid Cap funds meet criteria (all filtered out).
+
+**Solution**:
+1. Log warning: "No eligible Mid Cap funds found"
+2. Reallocate to closest category (Flexi-Cap or Large Cap)
+3. Maintain total SIP amount
+
+---
+
+### Case 2: Category Has Fewer Funds Than `num_schemes`
+**Problem**: Allocation says "Small Cap: 2 funds", but only 1 Small Cap fund exists.
+
+**Solution**:
+1. Pick available fund (1)
+2. Split remaining amount:
+   - Option A: Add to another Small Cap fund (if exists)
+   - Option B: Reallocate to Mid Cap (similar risk)
+
+---
+
+### Case 3: SIP Amount Too Low for Diversification
+**Problem**: ₹1,500 SIP, but allocation says 3 funds (₹500 each meets minimums, but no diversification).
+
+**Solution**:
+1. Simplify portfolio: Pick top 1-2 funds only
+2. Warn user: "For better diversification, increase SIP to ₹5,000+"
+
+## Validation Rules
+
+### Pre-Construction Checks:
+```python
+# 1. Check allocation matrix exists for this combo
+if risk_profile not in matrix or sip_bucket not in matrix[risk_profile]:
+    raise ValueError(f"No allocation found for {risk_profile} + {sip_bucket}")
+
+# 2. Verify percentages sum to 1.0
+total_pct = sum(cat["percentage"] for cat in allocation.values())
+assert abs(total_pct - 1.0) < 0.001, f"Percentages sum to {total_pct}, not 1.0"
+
+# 3. Check num_schemes > 0 for all categories with pct > 0
+for cat, config in allocation.items():
+    if config["percentage"] > 0:
+        assert config["num_schemes"] > 0, f"{cat} has 0 schemes but {config['percentage']*100}% allocation"
+```
+
+## Output Format
+
+```json
+{
+  "user_id": "USER12345",
+  "risk_profile": "Balanced Achiever",
+  "monthly_sip": 25000,
+  "sip_bucket": "Moderate",
+  "portfolio_version": "2025-10",
+  "funds": [
+    {
+      "fund_name": "Axis Bluechip Fund",
+      "fund_id": "ObjectId(...)",
+      "category": "Large Cap",
+      "sip_amount": 5000,
+      "composite_score": 1.56,
+      "rank": 1,
+      "why_recommended": "High alpha (2.3), Low beta (0.88), Consistent returns"
+    },
+    {
+      "fund_name": "HDFC Mid-Cap Opportunities Fund",
+      "fund_id": "ObjectId(...)",
+      "category": "Mid Cap",
+      "sip_amount": 3750,
+      "composite_score": 1.42,
+      "rank": 1,
+      "why_recommended": "Strong manager (10Y tenure), Top peer comparison"
+    }
+    // ... 8 more funds
+  ],
+  "total_allocated": 25000,
+  "asset_mix": {
+    "equity": 17500,  // 70%
+    "debt": 7500      // 30%
+  }
+}
+```
+
+## Related Files
+
+- `src/config/allocation_matrix.json` (full matrix with all combos)
+- `src/portfolio_construction/allocation_engine.py`
+- `src/portfolio_construction/fund_selector.py`
+- `src/portfolio_construction/constraints.py`
+
+## Common Pitfalls
+
+1. ❌ **DON'T** forget to validate matrix sums to 1.0
+2. ❌ **DON'T** pick same fund twice (use set of fund_ids)
+3. ❌ **DON'T** ignore SIP minimums (causes BSE API rejection)
+4. ❌ **DON'T** allocate <₹500 per fund (practical minimum)

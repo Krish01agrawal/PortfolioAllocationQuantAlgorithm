@@ -1,0 +1,610 @@
+# Development Workflow & Git Conventions
+
+## 🌳 Git Branching Strategy
+
+### Branch Types
+
+```
+main (production)
+  ↓
+develop (staging)
+  ↓
+feature/* (new features)
+bugfix/* (bug fixes)
+hotfix/* (urgent production fixes)
+```
+
+### Branch Naming Convention
+
+| Type | Pattern | Example | Purpose |
+|------|---------|---------|---------|
+| Feature | `feature/<ticket>-<short-desc>` | `feature/PLUTO-123-scoring-engine` | New functionality |
+| Bugfix | `bugfix/<ticket>-<short-desc>` | `bugfix/PLUTO-456-zscore-division-zero` | Non-urgent fixes |
+| Hotfix | `hotfix/<ticket>-<short-desc>` | `hotfix/PLUTO-789-mongodb-timeout` | Urgent production fixes |
+| Release | `release/v<version>` | `release/v1.2.0` | Preparing for production release |
+
+---
+
+## 🔄 Development Workflow
+
+### 1. Start New Feature
+
+```bash
+# Update develop branch
+git checkout develop
+git pull origin develop
+
+# Create feature branch
+git checkout -b feature/PLUTO-123-scoring-engine
+
+# Make changes...
+# (edit files, write tests, etc.)
+
+# Commit frequently with clear messages
+git add src/scoring_engine/z_score_calculator.py
+git commit -m "feat: implement Z-score calculation for category normalization
+
+- Add ZScoreCalculator class
+- Handle edge cases (stddev=0, nulls)
+- Load directionality config
+- Add unit tests with 90% coverage
+
+Closes PLUTO-123"
+```
+
+### 2. Push & Create Pull Request
+
+```bash
+# Push branch to remote
+git push origin feature/PLUTO-123-scoring-engine
+
+# Go to GitHub/GitLab and create PR:
+# - Title: "[PLUTO-123] Implement scoring engine"
+# - Description: What changed, why, how to test
+# - Assign reviewers
+# - Link to Jira ticket
+```
+
+### 3. Code Review Checklist
+
+**Reviewer checks**:
+- ✅ Code follows style guide (Black formatting, type hints)
+- ✅ Tests included and passing (pytest coverage >80%)
+- ✅ No secrets committed (.env, API keys)
+- ✅ Docstrings on public functions
+- ✅ Error handling with informative messages
+- ✅ No breaking changes (or documented)
+
+### 4. Merge to Develop
+
+```bash
+# After approval, merge via GitHub UI (squash commits)
+# Or locally:
+git checkout develop
+git merge --squash feature/PLUTO-123-scoring-engine
+git commit -m "feat: implement scoring engine (PLUTO-123)"
+git push origin develop
+```
+
+### 5. Deploy to Staging
+
+```bash
+# Automated via CI/CD (GitHub Actions)
+# On push to develop branch:
+# 1. Run tests
+# 2. Build Docker image
+# 3. Deploy to staging environment
+# 4. Run integration tests
+```
+
+### 6. Release to Production
+
+```bash
+# Create release branch
+git checkout -b release/v1.2.0 develop
+
+# Update version in files
+# - pyproject.toml
+# - __version__ = "1.2.0"
+# - CHANGELOG.md
+
+git commit -m "chore: bump version to 1.2.0"
+
+# Merge to main
+git checkout main
+git merge --no-ff release/v1.2.0
+git tag -a v1.2.0 -m "Release v1.2.0: Scoring engine + portfolio construction"
+git push origin main --tags
+
+# Merge back to develop
+git checkout develop
+git merge --no-ff release/v1.2.0
+git push origin develop
+
+# Delete release branch
+git branch -d release/v1.2.0
+```
+
+---
+
+## 📝 Commit Message Convention
+
+### Format
+```
+<type>(<scope>): <short summary>
+
+<longer description (optional)>
+
+<footer (optional)>
+```
+
+### Types
+
+| Type | Description | Example |
+|------|-------------|---------|
+| `feat` | New feature | `feat(scoring): add Z-score normalization` |
+| `fix` | Bug fix | `fix(allocation): handle division by zero in SIP split` |
+| `docs` | Documentation | `docs(readme): add setup instructions` |
+| `style` | Formatting (no code change) | `style: apply Black formatting` |
+| `refactor` | Code restructure (no behavior change) | `refactor(db): extract MongoDB client to singleton` |
+| `test` | Add/update tests | `test(scoring): add edge case for stddev=0` |
+| `chore` | Maintenance (deps, config) | `chore: update dependencies` |
+| `perf` | Performance improvement | `perf(query): add index on timestamp+category` |
+| `ci` | CI/CD changes | `ci: add GitHub Actions workflow` |
+
+### Scope (Optional)
+
+Module or area affected:
+- `scoring` (scoring engine)
+- `allocation` (portfolio construction)
+- `ingestion` (data loading)
+- `api` (REST API)
+- `bse` (BSE integration)
+- `db` (database)
+
+### Examples
+
+```bash
+# Good commits
+git commit -m "feat(scoring): implement Z-score calculator
+
+- Add ZScoreCalculator class with category-level normalization
+- Handle edge cases: <3 funds, stddev=0, null values
+- Load directionality config from JSON
+- Add comprehensive unit tests (95% coverage)
+
+Closes PLUTO-123"
+
+git commit -m "fix(allocation): prevent same AMC appearing twice in category
+
+- Add AMC diversification check
+- Replace duplicate with next-best fund from different AMC
+- Add test case for edge case
+
+Fixes PLUTO-456"
+
+git commit -m "docs: update PRD with scoring formula explanation"
+
+git commit -m "chore: upgrade FastAPI to 0.109.0"
+```
+
+```bash
+# Bad commits (avoid)
+git commit -m "fix stuff"  # Too vague
+git commit -m "WIP"  # Work-in-progress shouldn't be pushed
+git commit -m "asdfasdf"  # Meaningless
+```
+
+---
+
+## 🧪 Testing Workflow
+
+### Before Every Commit
+
+```bash
+# Run linter
+ruff check src/
+
+# Run formatter
+black src/ tests/
+
+# Run type checker
+mypy src/
+
+# Run tests with coverage
+pytest tests/ --cov=src --cov-report=html
+
+# Open coverage report
+open htmlcov/index.html
+```
+
+### Automated in CI/CD
+
+```yaml
+# .github/workflows/test.yml
+name: Test & Lint
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov black ruff mypy
+      
+      - name: Run linter
+        run: ruff check src/
+      
+      - name: Run formatter check
+        run: black --check src/ tests/
+      
+      - name: Run type checker
+        run: mypy src/
+      
+      - name: Run tests
+        run: pytest tests/ --cov=src --cov-report=xml
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+```
+
+---
+
+## 📦 Release Checklist
+
+### Pre-Release
+
+- [ ] All tests passing (100% on CI)
+- [ ] Code coverage ≥80%
+- [ ] No merge conflicts with `main`
+- [ ] CHANGELOG.md updated with new features/fixes
+- [ ] Version bumped in:
+  - [ ] `pyproject.toml`
+  - [ ] `src/__init__.py` (`__version__`)
+  - [ ] Documentation headers
+- [ ] Migration scripts tested (if DB schema changed)
+- [ ] Environment variables documented in `.env.example`
+
+### Release Steps
+
+```bash
+# 1. Create release branch
+git checkout -b release/v1.2.0 develop
+
+# 2. Update version files
+# (edit pyproject.toml, __init__.py, CHANGELOG.md)
+
+# 3. Commit version bump
+git commit -am "chore: bump version to v1.2.0"
+
+# 4. Merge to main
+git checkout main
+git merge --no-ff release/v1.2.0
+
+# 5. Tag release
+git tag -a v1.2.0 -m "Release v1.2.0
+
+## New Features
+- Scoring engine with Z-score normalization
+- Portfolio construction with constraint handling
+
+## Bug Fixes
+- Fixed division by zero in SIP allocation
+- Corrected AMC diversification logic
+
+## Breaking Changes
+- None
+"
+
+# 6. Push to GitHub
+git push origin main --tags
+
+# 7. Merge back to develop
+git checkout develop
+git merge --no-ff release/v1.2.0
+git push origin develop
+
+# 8. Delete release branch
+git branch -d release/v1.2.0
+git push origin --delete release/v1.2.0
+```
+
+### Post-Release
+
+- [ ] GitHub Release created with changelog
+- [ ] Production deployment successful
+- [ ] Smoke tests passed on production
+- [ ] Team notified in Slack
+- [ ] Documentation site updated
+
+---
+
+## 🔥 Hotfix Workflow (Urgent Production Fixes)
+
+### When to Use Hotfix
+
+- Critical bug in production
+- Security vulnerability
+- Data corruption issue
+
+### Workflow
+
+```bash
+# 1. Branch from main (not develop!)
+git checkout main
+git checkout -b hotfix/v1.2.1-mongodb-timeout
+
+# 2. Fix the issue
+# (edit files, add test)
+
+# 3. Commit with urgency tag
+git commit -am "fix(db): increase MongoDB connection timeout
+
+Urgent fix for production timeout errors.
+Increases connection pool timeout from 5s to 30s.
+
+Fixes PLUTO-URGENT-789"
+
+# 4. Merge to main
+git checkout main
+git merge --no-ff hotfix/v1.2.1-mongodb-timeout
+git tag -a v1.2.1 -m "Hotfix v1.2.1: Fix MongoDB timeout"
+git push origin main --tags
+
+# 5. Merge to develop too (keep in sync!)
+git checkout develop
+git merge --no-ff hotfix/v1.2.1-mongodb-timeout
+git push origin develop
+
+# 6. Delete hotfix branch
+git branch -d hotfix/v1.2.1-mongodb-timeout
+
+# 7. Deploy to production ASAP
+# (trigger manual CI/CD deployment)
+```
+
+---
+
+## 🏷️ Git Tags Convention
+
+### Tag Format
+
+```
+v<major>.<minor>.<patch>
+```
+
+### Examples
+
+| Tag | Description |
+|-----|-------------|
+| `v1.0.0` | Major release (breaking changes, new architecture) |
+| `v1.1.0` | Minor release (new features, backward-compatible) |
+| `v1.1.1` | Patch release (bug fixes only) |
+| `v1.2.0-beta.1` | Beta release (testing phase) |
+
+### Semantic Versioning Rules
+
+- **Major (X.0.0)**: Breaking changes, API changes, schema migrations
+- **Minor (1.X.0)**: New features, no breaking changes
+- **Patch (1.1.X)**: Bug fixes, security patches
+
+---
+
+## 🗂️ File Organization Best Practices
+
+### Directory Structure
+
+```
+PlutoMoneyQuant/
+├── src/                    # Source code (never commit temp files here)
+├── tests/                  # Tests mirror src/ structure
+├── scripts/                # One-off scripts (migrations, data fixes)
+├── notebooks/              # Jupyter notebooks (exploration, NOT production)
+├── docs/                   # Sphinx/MkDocs documentation
+├── .github/                # GitHub Actions workflows
+│   └── workflows/
+│       ├── test.yml
+│       ├── deploy-staging.yml
+│       └── deploy-production.yml
+├── requirements.txt        # Production dependencies
+├── requirements-dev.txt    # Dev dependencies (pytest, black, etc.)
+├── .env.example            # Template (no secrets!)
+└── README.md
+```
+
+### What NOT to Commit
+
+```gitignore
+# Secrets
+.env
+*.pem
+*.key
+credentials.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+*-checkpoint.ipynb
+
+# Logs
+*.log
+logs/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+```
+
+---
+
+## 🚀 CI/CD Pipeline
+
+### Stages
+
+```
+┌─────────────┐
+│   Push to   │
+│   develop   │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│  Run Tests  │  ← pytest, coverage, linting
+└──────┬──────┘
+       │
+       ▼ (if pass)
+┌─────────────┐
+│Build Docker │
+│    Image    │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│  Deploy to  │
+│   Staging   │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│Integration  │  ← End-to-end tests
+│   Tests     │
+└──────┬──────┘
+       │
+       ▼ (manual approval)
+┌─────────────┐
+│  Deploy to  │
+│ Production  │
+└─────────────┘
+```
+
+### Environment Variables per Stage
+
+| Variable | Development | Staging | Production |
+|----------|-------------|---------|------------|
+| `ENV` | `development` | `staging` | `production` |
+| `LOG_LEVEL` | `DEBUG` | `INFO` | `WARNING` |
+| `MONGODB_URI` | Local | Atlas (dev cluster) | Atlas (prod cluster) |
+| `BSE_API_URL` | Mock server | BSE UAT | BSE Production |
+
+---
+
+## 📞 Communication
+
+### Daily Standups (Async in Slack)
+
+```
+#standup channel
+
+🟢 Today:
+- Implementing group scorer (60% done)
+- Writing unit tests for Z-score edge cases
+
+🔴 Blockers:
+- Waiting for Morningstar API credentials
+
+💬 Need help with:
+- MongoDB aggregation query optimization
+```
+
+### Pull Request Template
+
+```markdown
+## Description
+Brief description of what this PR does.
+
+## Type of Change
+- [ ] 🐛 Bug fix
+- [ ] ✨ New feature
+- [ ] 📝 Documentation
+- [ ] 🎨 Code refactor
+- [ ] ⚡ Performance improvement
+
+## Checklist
+- [ ] Tests added/updated
+- [ ] Documentation updated
+- [ ] No breaking changes (or documented)
+- [ ] Linting & formatting applied
+- [ ] Reviewed own code
+
+## How to Test
+1. Step one
+2. Step two
+3. Expected result
+
+## Screenshots (if UI changes)
+[Attach images]
+
+## Related Issues
+Closes #123
+```
+
+---
+
+## 🔐 Security Practices
+
+### Secrets Management
+
+```bash
+# ✅ GOOD - Use environment variables
+export BSE_API_KEY="abc123xyz"
+python src/main.py
+
+# ❌ BAD - Hardcoded in code
+BSE_API_KEY = "abc123xyz"  # NEVER!
+```
+
+### Pre-Commit Hook (Prevent Secret Commits)
+
+```bash
+# .git/hooks/pre-commit (make executable: chmod +x)
+#!/bin/bash
+
+# Check for potential secrets
+if git diff --cached | grep -i "api_key\|password\|secret\|token"; then
+    echo "❌ ERROR: Possible secret detected in commit!"
+    echo "Review your changes and remove secrets."
+    exit 1
+fi
+
+# Check for .env file
+if git diff --cached --name-only | grep "\.env$"; then
+    echo "❌ ERROR: Attempting to commit .env file!"
+    echo "Add .env to .gitignore instead."
+    exit 1
+fi
+
+exit 0
+```
+
+---
+
+**Last Updated**: October 6, 2025

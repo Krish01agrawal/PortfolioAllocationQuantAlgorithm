@@ -1,0 +1,139 @@
+# Scoring Engine Context
+
+## Core Algorithm Knowledge
+
+### Z-Score Calculation
+When working with scoring logic, remember:
+
+1. **Category Isolation**: Z-scores are ALWAYS calculated per category (Large Cap funds only compete with Large Cap, not with Debt funds)
+
+2. **Directionality First**: Before calculating mean/stddev, apply directionality:
+   - **Higher is better**: Use value as-is (CAGR, Sharpe, Alpha, AUM, fund reputation)
+   - **Lower is better**: Multiply by -1 (Beta, StdDev, Expense Ratio, Drawdown, Recovery Period)
+
+3. **Formula**:
+   ```
+   directional_value = raw_value if higher_is_better else -raw_value
+   category_mean = mean(directional_values)
+   category_stddev = stddev(directional_values)
+   z_score = (directional_value - category_mean) / category_stddev
+   ```
+
+4. **Handle Edge Cases**:
+   - If category has <3 funds: Skip Z-score calculation (log warning)
+   - If stddev = 0 (all funds same value): Set stddev = 1.0 to avoid division by zero
+   - If parameter is null: Skip this fund for this parameter only
+
+### Group Scoring
+27 parameters are grouped into 8 categories:
+
+1. **returns_growth** (3 params): 5Y CAGR equity, 5Y CAGR debt/hybrid, 3Y rolling consistency
+2. **risk_adjusted** (4 params): Sharpe, Sortino, Alpha, Beta
+3. **volatility_drawdown** (4 params): Std Dev equity/debt, Max Drawdown, Recovery Period
+4. **expense_aum** (4 params): Expense ratio equity/debt, AUM equity/debt
+5. **downside_liquidity** (2 params): Downside capture ratio, Liquidity risk
+6. **fund_house_mgr** (4 params): Fund house reputation, Manager tenure, Track record, AMC risk mgmt
+7. **discipline_turnover** (3 params): Turnover ratio, Concentration/sector fit, Style fit
+8. **esg_forward** (6 params): ESG governance, Benchmark consistency, Peer comparison, Tax efficiency, Innovation, Risk mitigation
+
+**Group Score** = Average of Z-scores within that group (ignore nulls)
+
+### Composite Scoring
+Final score varies by risk profile due to different weightage:
+
+```python
+# Aggressive Explorer weights
+{
+  'returns_growth': 0.25,
+  'risk_adjusted': 0.15,
+  'volatility_drawdown': 0.10,
+  'expense_aum': 0.10,
+  'downside_liquidity': 0.05,
+  'fund_house_mgr': 0.10,
+  'discipline_turnover': 0.10,
+  'esg_forward': 0.15
+}
+
+# Safety Seeker weights (different priorities)
+{
+  'returns_growth': 0.10,
+  'risk_adjusted': 0.10,
+  'volatility_drawdown': 0.20,  # Higher focus on stability
+  'expense_aum': 0.20,
+  'downside_liquidity': 0.15,
+  'fund_house_mgr': 0.10,
+  'discipline_turnover': 0.10,
+  'esg_forward': 0.05
+}
+```
+
+**Composite Score** = Σ(group_score × weight) for all 8 groups
+
+### Ranking
+Within each category:
+1. Sort funds by composite_score DESC
+2. Assign rank: 1, 2, 3, ...
+3. Store in Collection 4 (mf_scores)
+
+## Code Patterns
+
+### When implementing Z-score calculator:
+```python
+# ALWAYS load directionality config
+with open("src/config/directionality.json") as f:
+    directionality = json.load(f)
+
+# ALWAYS check category size
+funds = collection.find({"fund_category": category_name})
+if len(funds) < 3:
+    logger.warning(f"Skipping {category_name}: only {len(funds)} funds")
+    return []
+
+# ALWAYS handle null values
+values = [f[param] for f in funds if f.get(param) is not None]
+```
+
+### When implementing group scorer:
+```python
+# ALWAYS load weightage config
+with open("src/config/weightage.json") as f:
+    config = json.load(f)
+    groups = config["parameter_groups"]
+
+# ALWAYS average only non-null Z-scores
+group_score = np.mean([z for z in z_scores if z is not None])
+```
+
+## Testing Guidelines
+
+### Critical Test Cases:
+1. Category with exactly 3 funds (minimum)
+2. Category with 1 fund (should skip)
+3. Parameter where all funds have same value (stddev=0)
+4. Parameter null for all funds in category
+5. Fund missing 50% of parameters (partial scoring)
+
+### Expected Outputs:
+- Z-scores range: typically -3 to +3 (68% of funds within -1 to +1)
+- Group scores range: similar to Z-scores
+- Composite scores: typically 0.5 to 2.0 for top-ranked funds
+
+## Common Pitfalls
+
+1. ❌ **DON'T** calculate Z-scores across all funds (must be per category)
+2. ❌ **DON'T** forget directionality (expense ratio as-is will favor expensive funds)
+3. ❌ **DON'T** use population stddev (use sample stddev with ddof=1)
+4. ❌ **DON'T** store Z-scores in Collection 2 (raw data) - they belong in Collection 4 (computed)
+
+## Collection References
+
+- **Input**: Collection 2 (mf_scheme_data_monthwise) - raw parameters
+- **Output**: Collection 4 (mf_scores) - ranked funds with Z-scores + group scores
+- **Config**: `src/config/directionality.json`, `src/config/weightage.json`
+
+## Related Files
+
+- `src/scoring_engine/z_score_calculator.py`
+- `src/scoring_engine/group_scorer.py`
+- `src/scoring_engine/composite_scorer.py`
+- `src/scoring_engine/ranker.py`

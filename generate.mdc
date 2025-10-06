@@ -1,0 +1,541 @@
+# Code Generation Guidelines
+
+## General Principles
+
+### 1. Readability Over Cleverness
+Write code that is immediately understandable:
+```python
+# ✅ GOOD - Clear intent
+funds_without_scores = [f for f in funds if f.get("sharpe_ratio") is None]
+
+# ❌ BAD - Too clever
+funds_without_scores = list(filter(lambda f: not f.get("sharpe_ratio"), funds))
+```
+
+### 2. Type Hints Everywhere
+```python
+# ✅ GOOD - Explicit types
+def calculate_z_score(value: float, mean: float, stddev: float) -> float:
+    return (value - mean) / stddev
+
+# ❌ BAD - No types
+def calculate_z_score(value, mean, stddev):
+    return (value - mean) / stddev
+```
+
+### 3. Docstrings for All Public Functions
+```python
+def get_top_n_funds(category: str, risk_profile: str, n: int) -> List[Dict]:
+    """
+    Retrieve top N ranked funds from a category for a given risk profile.
+    
+    Args:
+        category: Fund category (e.g., "Large Cap Equity")
+        risk_profile: One of 4 risk profiles ("Aggressive Explorer", etc.)
+        n: Number of top funds to return
+    
+    Returns:
+        List of fund dicts with keys: fund_name, fund_id, composite_score, rank
+    
+    Raises:
+        ValueError: If category or risk_profile not found
+        
+    Example:
+        >>> top_funds = get_top_n_funds("Large Cap Equity", "Balanced Achiever", 5)
+        >>> len(top_funds)
+        5
+    """
+    pass
+```
+
+### 4. Error Handling with Context
+```python
+# ✅ GOOD - Informative errors
+try:
+    allocation = matrix[risk_profile][sip_bucket]
+except KeyError:
+    raise ValueError(
+        f"No allocation found for risk_profile='{risk_profile}', sip_bucket='{sip_bucket}'. "
+        f"Available risk profiles: {list(matrix.keys())}"
+    )
+
+# ❌ BAD - Generic error
+allocation = matrix[risk_profile][sip_bucket]  # KeyError if missing
+```
+
+### 5. Logging for Observability
+```python
+from loguru import logger
+
+# Log key operations
+logger.info(f"Starting Z-score calculation for {len(funds)} funds in '{category}'")
+logger.debug(f"Category mean: {category_mean:.4f}, stddev: {category_stddev:.4f}")
+logger.warning(f"Skipping {len(null_funds)} funds with missing {param}")
+logger.error(f"Failed to load allocation matrix: {e}")
+```
+
+---
+
+## MongoDB Patterns
+
+### 1. Use Pydantic Models for Validation
+```python
+from pydantic import BaseModel, Field
+from datetime import datetime
+
+class MFSchemeTrackRecord(BaseModel):
+    """Represents a fund in Collection 1"""
+    id: Optional[PyObjectId] = Field(alias="_id", default=None)
+    fund_name: str
+    amc: str
+    scheme_code: str
+    schemeMonthTrackList: List[SchemeMonthTrack] = []
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+```
+
+### 2. Always Use Indexes for Queries
+```python
+# ✅ GOOD - Uses index on (timestamp, fund_category)
+funds = db.mf_scheme_data_monthwise.find({
+    "timestamp": latest_timestamp,
+    "fund_category": "Large Cap Equity"
+})
+
+# ❌ BAD - Full collection scan
+funds = db.mf_scheme_data_monthwise.find({
+    "fund_name": {"$regex": "^HDFC"}  # Regex without index = slow
+})
+```
+
+### 3. Use Aggregation for Complex Queries
+```python
+# Get historical rank trend for a fund
+pipeline = [
+    {"$match": {"category_name": "Large Cap Equity"}},
+    {"$unwind": "$mf_dec_scores"},
+    {"$match": {"mf_dec_scores.fund_id": fund_id}},
+    {"$project": {
+        "timestamp": 1,
+        "rank": "$mf_dec_scores.rank",
+        "score": "$mf_dec_scores.composite_score"
+    }},
+    {"$sort": {"timestamp": 1}}
+]
+
+trend = list(db.mf_scores.aggregate(pipeline))
+```
+
+### 4. Update References After Inserts
+```python
+# Insert snapshot into Collection 2
+snapshot_id = db.mf_scheme_data_monthwise.insert_one({
+    "timestamp": timestamp,
+    "fundId": fund_id,
+    "fund_name": "Axis Bluechip Fund",
+    # ... 27 parameters
+}).inserted_id
+
+# Update Collection 1 with reference
+db.mf_scheme_track_record.update_one(
+    {"_id": fund_id},
+    {"$push": {"schemeMonthTrackList": {
+        "timestamp": timestamp,
+        "mfDataId": snapshot_id
+    }}}
+)
+```
+
+---
+
+## Scoring Engine Patterns
+
+### 1. Load Config Once
+```python
+class ZScoreCalculator:
+    def __init__(self, timestamp: datetime):
+        self.timestamp = timestamp
+        
+        # Load config once in __init__ (not in every method call)
+        with open("src/config/directionality.json") as f:
+            self.directionality = json.load(f)
+```
+
+### 2. Handle Nulls Gracefully
+```python
+# Extract values, skipping nulls
+values = []
+for fund in funds:
+    val = fund.get(param)
+    if val is not None and not np.isnan(val):
+        values.append(val)
+
+# Check if enough data
+if len(values) < 2:
+    logger.warning(f"Insufficient data for {param} in {category} (only {len(values)} funds)")
+    continue  # Skip this parameter
+```
+
+### 3. Use NumPy for Statistics
+```python
+import numpy as np
+
+# ✅ GOOD - NumPy handles edge cases
+category_mean = np.mean(values)
+category_stddev = np.std(values, ddof=1)  # Sample stddev
+
+# ❌ BAD - Manual calculation prone to errors
+category_mean = sum(values) / len(values)
+category_stddev = (sum((v - category_mean)**2 for v in values) / (len(values) - 1)) ** 0.5
+```
+
+### 4. Avoid Division by Zero
+```python
+if category_stddev == 0:
+    logger.warning(f"All funds have same {param} value in {category} (stddev=0)")
+    category_stddev = 1.0  # Avoid division by zero; Z-scores will be 0
+
+z_score = (directional_value - category_mean) / category_stddev
+```
+
+---
+
+## Portfolio Construction Patterns
+
+### 1. Validate Inputs First
+```python
+def build_portfolio(risk_profile: str, monthly_sip: int) -> Dict:
+    # Validate inputs before any processing
+    if risk_profile not in ["Safety Seeker", "Conservative Guardian", "Balanced Achiever", "Aggressive Explorer"]:
+        raise ValueError(f"Invalid risk_profile: {risk_profile}")
+    
+    if monthly_sip < 500:
+        raise ValueError(f"Minimum SIP is ₹500, got ₹{monthly_sip}")
+    
+    # Proceed with construction
+    ...
+```
+
+### 2. Apply Constraints in Order
+```python
+# 1. Fetch top funds
+portfolio = fetch_top_funds(allocation, risk_profile)
+
+# 2. Apply SIP minimums
+portfolio = apply_sip_minimums(portfolio)
+
+# 3. Enforce AMC diversification
+portfolio = enforce_amc_diversity(portfolio)
+
+# 4. Round amounts
+portfolio = round_amounts(portfolio)
+
+# 5. Allocate residuals
+portfolio = allocate_residuals(portfolio, monthly_sip)
+
+return portfolio
+```
+
+### 3. Use Composition Over Inheritance
+```python
+# ✅ GOOD - Composition
+class PortfolioBuilder:
+    def __init__(self, allocation_engine, fund_selector, constraint_handler):
+        self.allocation_engine = allocation_engine
+        self.fund_selector = fund_selector
+        self.constraint_handler = constraint_handler
+    
+    def build(self, risk_profile, monthly_sip):
+        allocation = self.allocation_engine.get_allocation(risk_profile, monthly_sip)
+        portfolio = self.fund_selector.select_funds(allocation)
+        portfolio = self.constraint_handler.apply_constraints(portfolio)
+        return portfolio
+
+# ❌ BAD - Deep inheritance
+class AdvancedPortfolioBuilder(PortfolioBuilder):
+    class OptimizedAdvancedPortfolioBuilder(AdvancedPortfolioBuilder):
+        ...  # Becomes hard to reason about
+```
+
+---
+
+## FastAPI Patterns
+
+### 1. Use Pydantic for Request/Response
+```python
+from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException
+
+class RecommendationRequest(BaseModel):
+    risk_profile: str
+    monthly_sip: int
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "risk_profile": "Balanced Achiever",
+                "monthly_sip": 25000
+            }
+        }
+
+@app.post("/api/recommend")
+async def recommend_portfolio(request: RecommendationRequest):
+    try:
+        portfolio = build_portfolio(request.risk_profile, request.monthly_sip)
+        return {"success": True, "portfolio": portfolio}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+```
+
+### 2. Use Dependency Injection for DB
+```python
+from fastapi import Depends
+from src.config.database import get_db
+
+@app.get("/api/portfolio/{user_id}")
+async def get_portfolio(user_id: str, db = Depends(get_db)):
+    portfolio = await db.user_portfolios.find_one({"user_id": user_id})
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+    return portfolio
+```
+
+### 3. Use Background Tasks for Heavy Operations
+```python
+from fastapi import BackgroundTasks
+
+def send_email_notification(user_email: str, portfolio: Dict):
+    # Send email (slow operation)
+    pass
+
+@app.post("/api/recommend")
+async def recommend_portfolio(
+    request: RecommendationRequest,
+    background_tasks: BackgroundTasks
+):
+    portfolio = build_portfolio(request.risk_profile, request.monthly_sip)
+    
+    # Run email in background (don't block response)
+    background_tasks.add_task(send_email_notification, request.user_email, portfolio)
+    
+    return {"success": True, "portfolio": portfolio}
+```
+
+---
+
+## Testing Patterns
+
+### 1. Use Fixtures for Test Data
+```python
+import pytest
+
+@pytest.fixture
+def sample_funds():
+    """Fixture: Sample fund data for testing"""
+    return [
+        {
+            "fund_name": "Test Fund A",
+            "fund_category": "Large Cap Equity",
+            "five_year_cagr_equity": 13.8,
+            "sharpe_ratio": 1.12,
+            "expense_ratio_equity": 0.9
+        },
+        {
+            "fund_name": "Test Fund B",
+            "fund_category": "Large Cap Equity",
+            "five_year_cagr_equity": 11.5,
+            "sharpe_ratio": 0.98,
+            "expense_ratio_equity": 1.2
+        }
+    ]
+
+def test_z_score_calculation(sample_funds):
+    calculator = ZScoreCalculator(timestamp=datetime(2025, 10, 1))
+    scores = calculator.calculate_for_category("Large Cap Equity")
+    
+    assert len(scores) == 2
+    assert abs(scores[0]["z_scores"]["five_year_cagr_equity"] - 0.707) < 0.01
+```
+
+### 2. Test Edge Cases Explicitly
+```python
+def test_z_score_with_single_fund():
+    """Should skip Z-score calculation when <3 funds"""
+    calculator = ZScoreCalculator(timestamp=datetime(2025, 10, 1))
+    
+    # Mock category with 1 fund
+    with patch.object(calculator.collection2, 'find', return_value=[{"fund_name": "Single Fund"}]):
+        scores = calculator.calculate_for_category("Tiny Category")
+        
+        assert scores == []  # Should return empty list
+
+def test_z_score_with_zero_stddev():
+    """Should handle case where all funds have same value"""
+    calculator = ZScoreCalculator(timestamp=datetime(2025, 10, 1))
+    
+    funds = [
+        {"expense_ratio_equity": 0.9},
+        {"expense_ratio_equity": 0.9},
+        {"expense_ratio_equity": 0.9}
+    ]
+    
+    # Should set stddev=1.0 to avoid division by zero
+    # All Z-scores should be 0
+    ...
+```
+
+### 3. Mock External Dependencies
+```python
+from unittest.mock import patch, MagicMock
+
+def test_bse_api_integration():
+    """Test BSE API call without hitting real API"""
+    with patch("src.bse_integration.bse_client.httpx.post") as mock_post:
+        # Mock successful response
+        mock_post.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {"status": "SUCCESS", "order_id": "12345"}
+        )
+        
+        client = BSEClient()
+        response = client.register_sip(payload)
+        
+        assert response["status"] == "SUCCESS"
+        assert response["order_id"] == "12345"
+```
+
+---
+
+## File Organization
+
+### 1. One Class Per File (Generally)
+```
+src/scoring_engine/
+├── z_score_calculator.py      # ZScoreCalculator class
+├── group_scorer.py            # GroupScorer class
+├── composite_scorer.py        # CompositeScorer class
+└── ranker.py                  # Ranker class
+```
+
+### 2. Separate Utils from Business Logic
+```
+src/utils/
+├── logger.py                  # Logging setup
+├── date_utils.py              # Date/time helpers
+└── explanation_generator.py  # "Why this fund?" text
+
+src/scoring_engine/            # Core business logic
+```
+
+### 3. Config Files in JSON (Not Python)
+```python
+# ✅ GOOD - Editable without code changes
+with open("src/config/directionality.json") as f:
+    directionality = json.load(f)
+
+# ❌ BAD - Hardcoded in Python
+HIGHER_IS_BETTER = [
+    "five_year_cagr_equity",
+    "sharpe_ratio",
+    ...
+]
+```
+
+---
+
+## Performance Tips
+
+### 1. Batch Database Queries
+```python
+# ✅ GOOD - One query for all categories
+all_data = db.mf_scheme_data_monthwise.find({"timestamp": latest_timestamp})
+categories = defaultdict(list)
+for fund in all_data:
+    categories[fund["fund_category"]].append(fund)
+
+# ❌ BAD - One query per category (12 queries!)
+for category in all_categories:
+    funds = db.mf_scheme_data_monthwise.find({
+        "timestamp": latest_timestamp,
+        "fund_category": category
+    })
+```
+
+### 2. Use Generators for Large Datasets
+```python
+# ✅ GOOD - Generator (lazy loading)
+def iterate_funds():
+    cursor = db.mf_scheme_data_monthwise.find({})
+    for fund in cursor:
+        yield fund
+
+# ❌ BAD - Load all into memory
+funds = list(db.mf_scheme_data_monthwise.find({}))  # May be GBs!
+```
+
+### 3. Cache Expensive Computations
+```python
+from functools import lru_cache
+
+@lru_cache(maxsize=128)
+def get_allocation_matrix(risk_profile: str, sip_bucket: str) -> Dict:
+    """Cached: Avoid reloading JSON file on every request"""
+    with open("src/config/allocation_matrix.json") as f:
+        matrix = json.load(f)
+    return matrix[risk_profile][sip_bucket]
+```
+
+---
+
+## Security Best Practices
+
+### 1. Never Commit Secrets
+```python
+# ✅ GOOD - From environment variables
+import os
+BSE_API_KEY = os.getenv("BSE_API_KEY")
+
+# ❌ BAD - Hardcoded secret
+BSE_API_KEY = "abc123xyz456"  # NEVER DO THIS
+```
+
+### 2. Validate User Inputs
+```python
+from fastapi import HTTPException
+
+@app.post("/api/recommend")
+async def recommend_portfolio(request: RecommendationRequest):
+    # Validate SIP amount
+    if request.monthly_sip < 500 or request.monthly_sip > 1000000:
+        raise HTTPException(
+            status_code=400,
+            detail="SIP amount must be between ₹500 and ₹10,00,000"
+        )
+    
+    # Validate risk profile
+    valid_profiles = ["Safety Seeker", "Conservative Guardian", "Balanced Achiever", "Aggressive Explorer"]
+    if request.risk_profile not in valid_profiles:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid risk_profile. Must be one of: {valid_profiles}"
+        )
+    
+    # Proceed...
+```
+
+### 3. Use Parameterized Queries (MongoDB Injection Prevention)
+```python
+# ✅ GOOD - Parameterized
+fund = db.mf_scheme_track_record.find_one({"fund_name": user_input})
+
+# ❌ BAD - String concatenation (open to injection)
+query = f'{{"fund_name": "{user_input}"}}'  # If user_input = '", "$where": "1==1'
+fund = db.mf_scheme_track_record.find_one(eval(query))
+```
+
+---
+
+**Last Updated**: October 6, 2025

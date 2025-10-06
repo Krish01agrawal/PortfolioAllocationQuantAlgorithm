@@ -1,0 +1,335 @@
+# Database Schema Context
+
+## Architecture Philosophy
+
+**Time-Series with References Design**
+
+We use 4 collections in 2 pairs:
+1. **Raw Data Pair**: Collection 1 (master registry) ↔ Collection 2 (time-series snapshots)
+2. **Computed Data Pair**: Collection 3 (category registry) ↔ Collection 4 (time-series scores)
+
+## Why This Design?
+
+### Benefits:
+✅ **No Data Duplication**: Fund metadata stored once in Collection 1  
+✅ **Historical Tracking**: All past months preserved for trend analysis  
+✅ **Fast Queries**: ObjectId references enable efficient joins  
+✅ **Separation of Concerns**: Raw vs computed data isolated  
+✅ **Scalability**: Can handle 10+ years of monthly snapshots  
+
+### vs Embedded Design:
+❌ Embedding all monthly data in one document → bloated documents (>16MB limit)  
+❌ Hard to query specific months  
+❌ Difficult to rebuild scores without touching raw data  
+
+## Collection Details
+
+### Collection 1: `mf_scheme_track_record`
+
+**Purpose**: Master fund registry (like a phonebook)  
+**Lifespan**: Permanent (funds added, never deleted)  
+**Growth**: Slow (~50-100 new funds/year)  
+
+**Key Fields**:
+```javascript
+{
+  _id: ObjectId,
+  fund_name: String,  // Primary identifier
+  amc: String,
+  scheme_code: String,  // BSE/AMFI code for trading
+  schemeMonthTrackList: [
+    {
+      timestamp: ISODate,  // Month of snapshot
+      mfDataId: ObjectId   // → Collection 2
+    }
+  ]
+}
+```
+
+**Indexes**:
+```javascript
+db.mf_scheme_track_record.createIndex({ "fund_name": 1 })
+db.mf_scheme_track_record.createIndex({ "scheme_code": 1 }, { unique: true })
+```
+
+**Query Patterns**:
+```javascript
+// Get fund by name
+db.mf_scheme_track_record.findOne({ "fund_name": "Axis Bluechip Fund" })
+
+// Get all funds for an AMC
+db.mf_scheme_track_record.find({ "amc": "Axis Mutual Fund" })
+```
+
+---
+
+### Collection 2: `mf_scheme_data_monthwise`
+
+**Purpose**: Time-series of all 27 parameters per fund per month  
+**Lifespan**: Grows forever (never delete for historical analysis)  
+**Growth**: Fast (1,800 docs/month = 21,600/year)  
+
+**Key Fields**:
+```javascript
+{
+  _id: ObjectId,
+  timestamp: ISODate,  // Month-start date (2025-10-01)
+  fundId: ObjectId,    // → Collection 1
+  fund_name: String,
+  fund_category: String,  // "Large Cap Equity"
+  
+  // 27 parameters from Morningstar
+  five_year_cagr_equity: Float,
+  sharpe_ratio: Float,
+  expense_ratio_equity: Float,
+  // ... 24 more
+}
+```
+
+**Indexes**:
+```javascript
+// Most common query: Get latest data for a category
+db.mf_scheme_data_monthwise.createIndex({ 
+  "fund_category": 1, 
+  "timestamp": -1 
+})
+
+// Get all snapshots for a fund (historical trend)
+db.mf_scheme_data_monthwise.createIndex({ "fundId": 1, "timestamp": -1 })
+```
+
+**Query Patterns**:
+```javascript
+// Get latest month's data for all Large Cap funds
+db.mf_scheme_data_monthwise.find({
+  "fund_category": "Large Cap Equity",
+  "timestamp": ISODate("2025-10-01")
+})
+
+// Get historical data for one fund
+db.mf_scheme_data_monthwise.find({
+  "fundId": ObjectId("..."),
+  "timestamp": { $gte: ISODate("2025-04-01") }
+}).sort({ "timestamp": 1 })
+```
+
+---
+
+### Collection 3: `category_score`
+
+**Purpose**: Master list of 12 fund categories  
+**Lifespan**: Permanent (fixed list)  
+**Growth**: None (12 categories are static)  
+
+**Categories**:
+```javascript
+[
+  "Large Cap Equity",
+  "Mid Cap Equity",
+  "Small Cap Equity",
+  "Flexi-Cap / MultiCap",
+  "Index / ETF",
+  "International Equity",
+  "Hybrid – Conservative",
+  "Hybrid – Equity-Oriented",
+  "Debt – Corporate",
+  "Debt – Short/Ultra Short",
+  "Debt – Banking / PSU",
+  "Debt – Gilt"
+]
+```
+
+**Key Fields**:
+```javascript
+{
+  _id: ObjectId,
+  category_name: String,  // "Large Cap Equity"
+  category_code: String,  // "LARGE_CAP" (enum-friendly)
+  mf_scores_plan_list: [
+    {
+      timestamp: ISODate,
+      MF_Scores_id: ObjectId  // → Collection 4
+    }
+  ]
+}
+```
+
+**Indexes**:
+```javascript
+db.category_score.createIndex({ "category_name": 1 }, { unique: true })
+```
+
+---
+
+### Collection 4: `mf_scores`
+
+**Purpose**: Time-series of ranked/scored funds per category  
+**Lifespan**: Grows monthly  
+**Growth**: Medium (12 docs/month = 144/year)  
+
+**Key Fields**:
+```javascript
+{
+  _id: ObjectId,
+  timestamp: ISODate,
+  category_name: String,
+  mutual_fund_category_id: ObjectId,  // → Collection 3
+  risk_profile: String,  // "Aggressive Explorer"
+  
+  mf_dec_scores: [
+    {
+      fund_name: String,
+      fund_id: ObjectId,  // → Collection 1
+      composite_score: Float,  // 1.56
+      rank: Int,  // 1, 2, 3...
+      
+      group_scores: {
+        returns_growth: Float,
+        risk_adjusted: Float,
+        volatility_drawdown: Float,
+        expense_aum: Float,
+        downside_liquidity: Float,
+        fund_house_mgr: Float,
+        discipline_turnover: Float,
+        esg_forward: Float
+      },
+      
+      z_scores: {
+        five_year_cagr_equity: Float,
+        sharpe_ratio: Float,
+        // ... all 27 parameters
+      }
+    }
+  ]
+}
+```
+
+**Indexes**:
+```javascript
+// Get latest scores for a category + risk profile
+db.mf_scores.createIndex({ 
+  "category_name": 1, 
+  "risk_profile": 1,
+  "timestamp": -1 
+})
+
+// Get top-ranked funds quickly
+db.mf_scores.createIndex({ "mf_dec_scores.rank": 1 })
+```
+
+**Query Patterns**:
+```javascript
+// Get top 5 Large Cap funds for Balanced Achiever (latest month)
+db.mf_scores.findOne({
+  "category_name": "Large Cap Equity",
+  "risk_profile": "Balanced Achiever",
+  "timestamp": ISODate("2025-10-01")
+}, {
+  "mf_dec_scores": { $slice: 5 }  // Only top 5
+})
+
+// Get historical rank trend for a fund
+db.mf_scores.aggregate([
+  { $match: { "category_name": "Large Cap Equity" } },
+  { $unwind: "$mf_dec_scores" },
+  { $match: { "mf_dec_scores.fund_id": ObjectId("...") } },
+  { $project: {
+      timestamp: 1,
+      rank: "$mf_dec_scores.rank",
+      score: "$mf_dec_scores.composite_score"
+  }},
+  { $sort: { timestamp: 1 } }
+])
+```
+
+## Relationships
+
+```
+Collection 1 (mf_scheme_track_record)
+    ↓ 1:N (one fund, many monthly snapshots)
+Collection 2 (mf_scheme_data_monthwise)
+
+Collection 3 (category_score)
+    ↓ 1:N (one category, many monthly score lists)
+Collection 4 (mf_scores)
+    ↓ N:1 (each score references back to fund)
+Collection 1 (via fund_id)
+```
+
+## Data Flow
+
+```
+Monthly Ingestion:
+1. Parse Morningstar JSON
+2. Upsert Collection 1 (if new fund)
+3. Insert Collection 2 (new snapshot)
+4. Update Collection 1.schemeMonthTrackList (reference)
+
+Monthly Scoring:
+1. Read Collection 2 (raw parameters)
+2. Calculate Z-scores per category
+3. Group + weight → composite scores
+4. Rank funds
+5. Insert Collection 4 (new score snapshot)
+6. Update Collection 3.mf_scores_plan_list (reference)
+```
+
+## Code Patterns
+
+### When querying latest data:
+```python
+# ALWAYS use timestamp + category together
+latest_data = db.mf_scheme_data_monthwise.find({
+    "timestamp": latest_timestamp,
+    "fund_category": category_name
+})
+```
+
+### When inserting new snapshots:
+```python
+# ALWAYS update reference in master collection
+snapshot_id = db.mf_scheme_data_monthwise.insert_one(data).inserted_id
+
+db.mf_scheme_track_record.update_one(
+    {"_id": fund_id},
+    {"$push": {"schemeMonthTrackList": {
+        "timestamp": timestamp,
+        "mfDataId": snapshot_id
+    }}}
+)
+```
+
+### When joining collections:
+```python
+# Use aggregation pipeline
+pipeline = [
+    {"$match": {"category_name": "Large Cap Equity"}},
+    {"$lookup": {
+        "from": "mf_scheme_track_record",
+        "localField": "mf_dec_scores.fund_id",
+        "foreignField": "_id",
+        "as": "fund_details"
+    }}
+]
+```
+
+## Migration Strategy
+
+If schema changes:
+1. **Add fields**: Just insert with new field (MongoDB is schemaless)
+2. **Rename fields**: Use `$rename` aggregation
+3. **Remove fields**: Use `$unset` (but don't delete historical data!)
+
+## Backup Strategy
+
+- **Frequency**: Daily automated backups (MongoDB Atlas Point-in-Time Recovery)
+- **Retention**: 30 days rolling
+- **Critical collections**: Collection 1 & 2 (raw data) - rest can be recomputed
+
+## Related Files
+
+- `src/models/mf_scheme_track_record.py`
+- `src/models/mf_scheme_data_monthwise.py`
+- `src/models/category_score.py`
+- `src/models/mf_scores.py`
+- `src/config/database.py`
