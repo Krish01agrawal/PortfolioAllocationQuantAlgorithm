@@ -1,4 +1,4 @@
-# Scoring Engine Context
+# Scoring Engine Context (NestJS/TypeScript)
 
 ## Core Algorithm Knowledge
 
@@ -12,17 +12,17 @@ When working with scoring logic, remember:
    - **Lower is better**: Multiply by -1 (Beta, StdDev, Expense Ratio, Drawdown, Recovery Period)
 
 3. **Formula**:
-   ```
-   directional_value = raw_value if higher_is_better else -raw_value
-   category_mean = mean(directional_values)
-   category_stddev = stddev(directional_values)
-   z_score = (directional_value - category_mean) / category_stddev
+   ```typescript
+   const directionalValue = lowerIsBetter.includes(param) ? -rawValue : rawValue;
+   const categoryMean = mean(directionalValues);
+   const categoryStddev = standardDeviation(directionalValues);
+   const zScore = (directionalValue - categoryMean) / categoryStddev;
    ```
 
 4. **Handle Edge Cases**:
    - If category has <3 funds: Skip Z-score calculation (log warning)
    - If stddev = 0 (all funds same value): Set stddev = 1.0 to avoid division by zero
-   - If parameter is null: Skip this fund for this parameter only
+   - If parameter is null/undefined: Skip this fund for this parameter only
 
 ### Group Scoring
 27 parameters are grouped into 8 categories:
@@ -75,33 +75,40 @@ Within each category:
 2. Assign rank: 1, 2, 3, ...
 3. Store in Collection 4 (mf_scores)
 
-## Code Patterns
+## Code Patterns (TypeScript/NestJS)
 
 ### When implementing Z-score calculator:
-```python
-# ALWAYS load directionality config
-with open("src/config/directionality.json") as f:
-    directionality = json.load(f)
+```typescript
+// ALWAYS load directionality config in constructor
+constructor() {
+  const configPath = join(process.cwd(), 'src/config/json/directionality.json');
+  this.directionalityConfig = JSON.parse(readFileSync(configPath, 'utf-8'));
+}
 
-# ALWAYS check category size
-funds = collection.find({"fund_category": category_name})
-if len(funds) < 3:
-    logger.warning(f"Skipping {category_name}: only {len(funds)} funds")
-    return []
+// ALWAYS check category size
+const funds = await this.mfSchemeDataModel.find({ fundCategory: categoryName }).lean();
+if (funds.length < 3) {
+  this.logger.warn(`Skipping ${categoryName}: only ${funds.length} funds`);
+  return [];
+}
 
-# ALWAYS handle null values
-values = [f[param] for f in funds if f.get(param) is not None]
+// ALWAYS handle null/undefined values
+const values = funds
+  .map(f => f[param])
+  .filter(v => v !== null && v !== undefined && !isNaN(v));
 ```
 
 ### When implementing group scorer:
-```python
-# ALWAYS load weightage config
-with open("src/config/weightage.json") as f:
-    config = json.load(f)
-    groups = config["parameter_groups"]
+```typescript
+// ALWAYS load weightage config
+const configPath = join(process.cwd(), 'src/config/json/weightage.json');
+const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+const groups = config.parameterGroups;
 
-# ALWAYS average only non-null Z-scores
-group_score = np.mean([z for z in z_scores if z is not None])
+// ALWAYS average only non-null Z-scores
+const groupScore = mean(
+  Object.values(zScores).filter(z => z !== null && z !== undefined)
+);
 ```
 
 ## Testing Guidelines
@@ -131,9 +138,11 @@ group_score = np.mean([z for z in z_scores if z is not None])
 - **Output**: Collection 4 (mf_scores) - ranked funds with Z-scores + group scores
 - **Config**: `src/config/directionality.json`, `src/config/weightage.json`
 
-## Related Files
+## Related Files (NestJS)
 
-- `src/scoring_engine/z_score_calculator.py`
-- `src/scoring_engine/group_scorer.py`
-- `src/scoring_engine/composite_scorer.py`
-- `src/scoring_engine/ranker.py`
+- `src/scoring-engine/z-score-calculator.service.ts`
+- `src/scoring-engine/group-scorer.service.ts`
+- `src/scoring-engine/composite-scorer.service.ts`
+- `src/scoring-engine/ranker.service.ts`
+- `src/schemas/mf-scheme-data-monthwise.schema.ts`
+- `src/schemas/mf-scores.schema.ts`

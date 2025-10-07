@@ -1,204 +1,255 @@
-# Code Generation Guidelines
+# Code Generation Guidelines (NestJS/TypeScript)
 
 ## General Principles
 
 ### 1. Readability Over Cleverness
 Write code that is immediately understandable:
-```python
-# ✅ GOOD - Clear intent
-funds_without_scores = [f for f in funds if f.get("sharpe_ratio") is None]
+```typescript
+// ✅ GOOD - Clear intent
+const fundsWithoutScores = funds.filter(f => f.sharpeRatio === undefined);
 
-# ❌ BAD - Too clever
-funds_without_scores = list(filter(lambda f: not f.get("sharpe_ratio"), funds))
+// ❌ BAD - Too clever with unnecessary reduce
+const fundsWithoutScores = funds.reduce((acc, f) => !f.sharpeRatio ? [...acc, f] : acc, []);
 ```
 
-### 2. Type Hints Everywhere
-```python
-# ✅ GOOD - Explicit types
-def calculate_z_score(value: float, mean: float, stddev: float) -> float:
-    return (value - mean) / stddev
+### 2. Type Safety Everywhere
+```typescript
+// ✅ GOOD - Explicit types
+function calculateZScore(value: number, mean: number, stddev: number): number {
+  return (value - mean) / stddev;
+}
 
-# ❌ BAD - No types
-def calculate_z_score(value, mean, stddev):
-    return (value - mean) / stddev
+// ❌ BAD - No types (implicit any)
+function calculateZScore(value, mean, stddev) {
+  return (value - mean) / stddev;
+}
 ```
 
-### 3. Docstrings for All Public Functions
-```python
-def get_top_n_funds(category: str, risk_profile: str, n: int) -> List[Dict]:
-    """
-    Retrieve top N ranked funds from a category for a given risk profile.
-    
-    Args:
-        category: Fund category (e.g., "Large Cap Equity")
-        risk_profile: One of 4 risk profiles ("Aggressive Explorer", etc.)
-        n: Number of top funds to return
-    
-    Returns:
-        List of fund dicts with keys: fund_name, fund_id, composite_score, rank
-    
-    Raises:
-        ValueError: If category or risk_profile not found
-        
-    Example:
-        >>> top_funds = get_top_n_funds("Large Cap Equity", "Balanced Achiever", 5)
-        >>> len(top_funds)
-        5
-    """
-    pass
+### 3. JSDoc for All Public Methods
+```typescript
+/**
+ * Retrieve top N ranked funds from a category for a given risk profile.
+ *
+ * @param category - Fund category (e.g., "Large Cap Equity")
+ * @param riskProfile - One of 4 risk profiles ("Aggressive Explorer", etc.)
+ * @param n - Number of top funds to return
+ * @returns Array of fund objects with scores and ranks
+ * @throws {NotFoundException} If category or risk profile not found
+ *
+ * @example
+ * ```typescript
+ * const topFunds = await this.getTopNFunds("Large Cap Equity", "Balanced Achiever", 5);
+ * console.log(topFunds.length); // 5
+ * ```
+ */
+async getTopNFunds(category: string, riskProfile: string, n: number): Promise<FundScore[]> {
+  // Implementation
+}
 ```
 
 ### 4. Error Handling with Context
-```python
-# ✅ GOOD - Informative errors
-try:
-    allocation = matrix[risk_profile][sip_bucket]
-except KeyError:
-    raise ValueError(
-        f"No allocation found for risk_profile='{risk_profile}', sip_bucket='{sip_bucket}'. "
-        f"Available risk profiles: {list(matrix.keys())}"
-    )
+```typescript
+// ✅ GOOD - Informative errors
+try {
+  const allocation = matrix[riskProfile][sipBucket];
+} catch (error) {
+  throw new NotFoundException(
+    `No allocation found for riskProfile='${riskProfile}', sipBucket='${sipBucket}'. ` +
+    `Available risk profiles: ${Object.keys(matrix).join(', ')}`
+  );
+}
 
-# ❌ BAD - Generic error
-allocation = matrix[risk_profile][sip_bucket]  # KeyError if missing
+// ❌ BAD - Generic error
+const allocation = matrix[riskProfile][sipBucket]; // Throws generic error
 ```
 
 ### 5. Logging for Observability
-```python
-from loguru import logger
+```typescript
+import { Logger } from '@nestjs/common';
 
-# Log key operations
-logger.info(f"Starting Z-score calculation for {len(funds)} funds in '{category}'")
-logger.debug(f"Category mean: {category_mean:.4f}, stddev: {category_stddev:.4f}")
-logger.warning(f"Skipping {len(null_funds)} funds with missing {param}")
-logger.error(f"Failed to load allocation matrix: {e}")
+@Injectable()
+export class ZScoreCalculatorService {
+  private readonly logger = new Logger(ZScoreCalculatorService.name);
+
+  async calculate(categoryName: string): Promise<ZScore[]> {
+    this.logger.log(`Starting Z-score calculation for ${categoryName}`);
+    this.logger.debug(`Category mean: ${mean.toFixed(4)}, stddev: ${stddev.toFixed(4)}`);
+    this.logger.warn(`Skipping ${nullCount} funds with missing ${param}`);
+    this.logger.error(`Failed to calculate: ${error.message}`, error.stack);
+    
+    return scores;
+  }
+}
 ```
 
 ---
 
-## MongoDB Patterns
+## NestJS Patterns
 
-### 1. Use Pydantic Models for Validation
-```python
-from pydantic import BaseModel, Field
-from datetime import datetime
+### 1. Dependency Injection
+```typescript
+// ✅ GOOD - Constructor injection
+@Injectable()
+export class PortfolioConstructionService {
+  constructor(
+    private readonly allocationEngine: AllocationEngineService,
+    private readonly fundSelector: FundSelectorService,
+    @InjectModel(MfScores.name) private mfScoresModel: Model<MfScores>,
+  ) {}
 
-class MFSchemeTrackRecord(BaseModel):
-    """Represents a fund in Collection 1"""
-    id: Optional[PyObjectId] = Field(alias="_id", default=None)
-    fund_name: str
-    amc: str
-    scheme_code: str
-    schemeMonthTrackList: List[SchemeMonthTrack] = []
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    
-    class Config:
-        populate_by_name = True
-        json_encoders = {ObjectId: str}
+  async buildPortfolio(dto: RecommendationRequestDto): Promise<Portfolio> {
+    const allocation = await this.allocationEngine.getAllocation(dto);
+    return this.fundSelector.selectFunds(allocation);
+  }
+}
+
+// ❌ BAD - No DI, tight coupling
+export class PortfolioConstructionService {
+  async buildPortfolio(dto: RecommendationRequestDto): Promise<Portfolio> {
+    const engine = new AllocationEngineService(); // Hard-coded dependency
+    const allocation = await engine.getAllocation(dto);
+    return allocation;
+  }
+}
 ```
 
-### 2. Always Use Indexes for Queries
-```python
-# ✅ GOOD - Uses index on (timestamp, fund_category)
-funds = db.mf_scheme_data_monthwise.find({
-    "timestamp": latest_timestamp,
-    "fund_category": "Large Cap Equity"
-})
+### 2. DTOs for Validation
+```typescript
+import { IsString, IsNumber, Min, Max, IsEnum } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
-# ❌ BAD - Full collection scan
-funds = db.mf_scheme_data_monthwise.find({
-    "fund_name": {"$regex": "^HDFC"}  # Regex without index = slow
-})
+export class RecommendationRequestDto {
+  @ApiProperty({ example: 'Balanced Achiever', enum: ['Safety Seeker', 'Conservative Guardian', 'Balanced Achiever', 'Aggressive Explorer'] })
+  @IsString()
+  @IsEnum(['Safety Seeker', 'Conservative Guardian', 'Balanced Achiever', 'Aggressive Explorer'])
+  riskProfile: string;
+
+  @ApiProperty({ example: 25000, minimum: 500, maximum: 1000000 })
+  @IsNumber()
+  @Min(500)
+  @Max(1000000)
+  monthlySip: number;
+}
+
+// Usage in controller
+@Post('recommend')
+async recommend(@Body() dto: RecommendationRequestDto): Promise<Portfolio> {
+  // DTO is automatically validated by class-validator
+  return this.portfolioService.buildPortfolio(dto);
+}
 ```
 
-### 3. Use Aggregation for Complex Queries
-```python
-# Get historical rank trend for a fund
-pipeline = [
-    {"$match": {"category_name": "Large Cap Equity"}},
-    {"$unwind": "$mf_dec_scores"},
-    {"$match": {"mf_dec_scores.fund_id": fund_id}},
-    {"$project": {
-        "timestamp": 1,
-        "rank": "$mf_dec_scores.rank",
-        "score": "$mf_dec_scores.composite_score"
-    }},
-    {"$sort": {"timestamp": 1}}
-]
+### 3. Mongoose Models
+```typescript
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types } from 'mongoose';
 
-trend = list(db.mf_scores.aggregate(pipeline))
+@Schema({ collection: 'mfSchemeTrackRecord', timestamps: true })
+export class MfSchemeTrackRecord extends Document {
+  @Prop({ required: true, index: true })
+  fundName: string;
+
+  @Prop({ required: true, type: Types.ObjectId, ref: 'MfSchemeDataMonthwise' })
+  latestDataId: Types.ObjectId;
+
+  @Prop({ type: [{ timestamp: Date, mfDataId: Types.ObjectId }], default: [] })
+  schemeMonthTrackList: { timestamp: Date; mfDataId: Types.ObjectId }[];
+}
+
+export const MfSchemeTrackRecordSchema = SchemaFactory.createForClass(MfSchemeTrackRecord);
+
+// Add indexes
+MfSchemeTrackRecordSchema.index({ fundName: 1 });
+MfSchemeTrackRecordSchema.index({ schemeCode: 1 }, { unique: true });
 ```
 
 ### 4. Update References After Inserts
-```python
-# Insert snapshot into Collection 2
-snapshot_id = db.mf_scheme_data_monthwise.insert_one({
-    "timestamp": timestamp,
-    "fundId": fund_id,
-    "fund_name": "Axis Bluechip Fund",
-    # ... 27 parameters
-}).inserted_id
+```typescript
+// Insert snapshot into Collection 2
+const snapshot = new this.mfSchemeDataModel({
+  timestamp,
+  fundId: fund._id,
+  fundName: 'Axis Bluechip Fund',
+  // ... 27 parameters
+});
+const savedSnapshot = await snapshot.save();
 
-# Update Collection 1 with reference
-db.mf_scheme_track_record.update_one(
-    {"_id": fund_id},
-    {"$push": {"schemeMonthTrackList": {
-        "timestamp": timestamp,
-        "mfDataId": snapshot_id
-    }}}
-)
+// Update Collection 1 with reference
+await this.mfSchemeTrackRecordModel.updateOne(
+  { _id: fund._id },
+  {
+    $push: {
+      schemeMonthTrackList: {
+        timestamp,
+        mfDataId: savedSnapshot._id,
+      },
+    },
+  },
+);
 ```
 
 ---
 
 ## Scoring Engine Patterns
 
-### 1. Load Config Once
-```python
-class ZScoreCalculator:
-    def __init__(self, timestamp: datetime):
-        self.timestamp = timestamp
-        
-        # Load config once in __init__ (not in every method call)
-        with open("src/config/directionality.json") as f:
-            self.directionality = json.load(f)
+### 1. Load Config Once (Dependency Injection)
+```typescript
+@Injectable()
+export class ZScoreCalculatorService {
+  private directionalityConfig: DirectionalityConfig;
+
+  constructor() {
+    // Load config once in constructor
+    const configPath = join(process.cwd(), 'src/config/json/directionality.json');
+    this.directionalityConfig = JSON.parse(readFileSync(configPath, 'utf-8'));
+  }
+
+  // Methods use this.directionalityConfig
+}
 ```
 
 ### 2. Handle Nulls Gracefully
-```python
-# Extract values, skipping nulls
-values = []
-for fund in funds:
-    val = fund.get(param)
-    if val is not None and not np.isnan(val):
-        values.append(val)
+```typescript
+// Extract values, skipping nulls/undefined
+const values: number[] = [];
+for (const fund of funds) {
+  const val = fund[param];
+  if (val !== null && val !== undefined && !isNaN(val)) {
+    values.push(val);
+  }
+}
 
-# Check if enough data
-if len(values) < 2:
-    logger.warning(f"Insufficient data for {param} in {category} (only {len(values)} funds)")
-    continue  # Skip this parameter
+// Check if enough data
+if (values.length < 2) {
+  this.logger.warn(`Insufficient data for ${param} in ${category} (only ${values.length} funds)`);
+  continue; // Skip this parameter
+}
 ```
 
-### 3. Use NumPy for Statistics
-```python
-import numpy as np
+### 3. Use Libraries for Statistics
+```typescript
+import { mean, standardDeviation } from 'simple-statistics';
 
-# ✅ GOOD - NumPy handles edge cases
-category_mean = np.mean(values)
-category_stddev = np.std(values, ddof=1)  # Sample stddev
+// ✅ GOOD - Library handles edge cases
+const categoryMean = mean(values);
+const categoryStddev = standardDeviation(values); // Sample stddev by default
 
-# ❌ BAD - Manual calculation prone to errors
-category_mean = sum(values) / len(values)
-category_stddev = (sum((v - category_mean)**2 for v in values) / (len(values) - 1)) ** 0.5
+// ❌ BAD - Manual calculation prone to errors
+const categoryMean = values.reduce((sum, v) => sum + v, 0) / values.length;
+const variance = values.reduce((sum, v) => sum + Math.pow(v - categoryMean, 2), 0) / (values.length - 1);
+const categoryStddev = Math.sqrt(variance);
 ```
 
 ### 4. Avoid Division by Zero
-```python
-if category_stddev == 0:
-    logger.warning(f"All funds have same {param} value in {category} (stddev=0)")
-    category_stddev = 1.0  # Avoid division by zero; Z-scores will be 0
+```typescript
+let categoryStddev = standardDeviation(values);
 
-z_score = (directional_value - category_mean) / category_stddev
+if (categoryStddev === 0) {
+  this.logger.warn(`All funds have same ${param} value in ${category} (stddev=0)`);
+  categoryStddev = 1.0; // Avoid division by zero; Z-scores will be 0
+}
+
+const zScore = (directionalValue - categoryMean) / categoryStddev;
 ```
 
 ---
@@ -206,336 +257,353 @@ z_score = (directional_value - category_mean) / category_stddev
 ## Portfolio Construction Patterns
 
 ### 1. Validate Inputs First
-```python
-def build_portfolio(risk_profile: str, monthly_sip: int) -> Dict:
-    # Validate inputs before any processing
-    if risk_profile not in ["Safety Seeker", "Conservative Guardian", "Balanced Achiever", "Aggressive Explorer"]:
-        raise ValueError(f"Invalid risk_profile: {risk_profile}")
+```typescript
+@Injectable()
+export class PortfolioConstructionService {
+  async buildPortfolio(dto: RecommendationRequestDto): Promise<Portfolio> {
+    // DTOs handle validation, but add business logic checks
+    const sipBucket = this.getSipBucket(dto.monthlySip);
     
-    if monthly_sip < 500:
-        raise ValueError(f"Minimum SIP is ₹500, got ₹{monthly_sip}")
+    if (!this.allocationMatrix[dto.riskProfile]) {
+      throw new NotFoundException(`Risk profile '${dto.riskProfile}' not found`);
+    }
     
-    # Proceed with construction
-    ...
+    if (!this.allocationMatrix[dto.riskProfile][sipBucket]) {
+      throw new NotFoundException(`No allocation for ${dto.riskProfile} + ${sipBucket}`);
+    }
+    
+    // Proceed with construction
+    // ...
+  }
+}
 ```
 
 ### 2. Apply Constraints in Order
-```python
-# 1. Fetch top funds
-portfolio = fetch_top_funds(allocation, risk_profile)
+```typescript
+async buildPortfolio(dto: RecommendationRequestDto): Promise<Portfolio> {
+  // 1. Fetch top funds
+  let portfolio = await this.fetchTopFunds(allocation, dto.riskProfile);
 
-# 2. Apply SIP minimums
-portfolio = apply_sip_minimums(portfolio)
+  // 2. Apply SIP minimums
+  portfolio = this.applySipMinimums(portfolio);
 
-# 3. Enforce AMC diversification
-portfolio = enforce_amc_diversity(portfolio)
+  // 3. Enforce AMC diversification
+  portfolio = await this.enforceAmcDiversity(portfolio);
 
-# 4. Round amounts
-portfolio = round_amounts(portfolio)
+  // 4. Round amounts
+  portfolio = this.roundAmounts(portfolio);
 
-# 5. Allocate residuals
-portfolio = allocate_residuals(portfolio, monthly_sip)
+  // 5. Allocate residuals
+  portfolio = this.allocateResiduals(portfolio, dto.monthlySip);
 
-return portfolio
+  return portfolio;
+}
 ```
 
-### 3. Use Composition Over Inheritance
-```python
-# ✅ GOOD - Composition
-class PortfolioBuilder:
-    def __init__(self, allocation_engine, fund_selector, constraint_handler):
-        self.allocation_engine = allocation_engine
-        self.fund_selector = fund_selector
-        self.constraint_handler = constraint_handler
-    
-    def build(self, risk_profile, monthly_sip):
-        allocation = self.allocation_engine.get_allocation(risk_profile, monthly_sip)
-        portfolio = self.fund_selector.select_funds(allocation)
-        portfolio = self.constraint_handler.apply_constraints(portfolio)
-        return portfolio
+### 3. Use Interfaces for Type Safety
+```typescript
+interface CategoryAllocation {
+  percentage: number;
+  numSchemes: number;
+}
 
-# ❌ BAD - Deep inheritance
-class AdvancedPortfolioBuilder(PortfolioBuilder):
-    class OptimizedAdvancedPortfolioBuilder(AdvancedPortfolioBuilder):
-        ...  # Becomes hard to reason about
+interface AllocationMatrix {
+  [riskProfile: string]: {
+    [sipBucket: string]: {
+      [category: string]: CategoryAllocation;
+    };
+  };
+}
+
+// Load with type checking
+const matrix: AllocationMatrix = JSON.parse(
+  readFileSync('src/config/json/allocation-matrix.json', 'utf-8')
+);
 ```
 
 ---
 
-## FastAPI Patterns
+## Controller Patterns
 
-### 1. Use Pydantic for Request/Response
-```python
-from pydantic import BaseModel
-from fastapi import FastAPI, HTTPException
+### 1. Use Decorators for Routing
+```typescript
+import { Controller, Post, Body, Get, Param, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
-class RecommendationRequest(BaseModel):
-    risk_profile: str
-    monthly_sip: int
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "risk_profile": "Balanced Achiever",
-                "monthly_sip": 25000
-            }
-        }
+@ApiTags('Portfolio')
+@Controller('api/portfolio')
+export class PortfolioController {
+  constructor(private readonly portfolioService: PortfolioConstructionService) {}
 
-@app.post("/api/recommend")
-async def recommend_portfolio(request: RecommendationRequest):
-    try:
-        portfolio = build_portfolio(request.risk_profile, request.monthly_sip)
-        return {"success": True, "portfolio": portfolio}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+  @Post('recommend')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get portfolio recommendation' })
+  @ApiResponse({ status: 200, description: 'Portfolio generated successfully', type: PortfolioResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid request data' })
+  async recommend(@Body() dto: RecommendationRequestDto): Promise<PortfolioResponseDto> {
+    return this.portfolioService.buildPortfolio(dto);
+  }
+
+  @Get(':userId')
+  @ApiOperation({ summary: 'Get user portfolio' })
+  async getPortfolio(@Param('userId') userId: string): Promise<Portfolio> {
+    return this.portfolioService.getPortfolio(userId);
+  }
+}
 ```
 
-### 2. Use Dependency Injection for DB
-```python
-from fastapi import Depends
-from src.config.database import get_db
+### 2. Use Pipes for Transformation
+```typescript
+import { ParseIntPipe, ValidationPipe } from '@nestjs/common';
 
-@app.get("/api/portfolio/{user_id}")
-async def get_portfolio(user_id: str, db = Depends(get_db)):
-    portfolio = await db.user_portfolios.find_one({"user_id": user_id})
-    if not portfolio:
-        raise HTTPException(status_code=404, detail="Portfolio not found")
-    return portfolio
+@Get(':id')
+async getFund(@Param('id', ParseIntPipe) id: number): Promise<Fund> {
+  // id is automatically converted to number
+  return this.fundService.findOne(id);
+}
+
+// Global validation pipe (in main.ts)
+app.useGlobalPipes(new ValidationPipe({
+  whitelist: true,  // Strip unknown properties
+  forbidNonWhitelisted: true,  // Throw error on unknown properties
+  transform: true,  // Auto-transform to DTO types
+}));
 ```
 
-### 3. Use Background Tasks for Heavy Operations
-```python
-from fastapi import BackgroundTasks
+### 3. Use Guards for Authentication
+```typescript
+import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 
-def send_email_notification(user_email: str, portfolio: Dict):
-    # Send email (slow operation)
-    pass
+@Injectable()
+export class JwtAuthGuard implements CanActivate {
+  constructor(private jwtService: JwtService) {}
 
-@app.post("/api/recommend")
-async def recommend_portfolio(
-    request: RecommendationRequest,
-    background_tasks: BackgroundTasks
-):
-    portfolio = build_portfolio(request.risk_profile, request.monthly_sip)
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest();
+    const token = request.headers.authorization?.split(' ')[1];
     
-    # Run email in background (don't block response)
-    background_tasks.add_task(send_email_notification, request.user_email, portfolio)
-    
-    return {"success": True, "portfolio": portfolio}
+    try {
+      const payload = this.jwtService.verify(token);
+      request.user = payload;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+// Usage
+@Post('recommend')
+@UseGuards(JwtAuthGuard)
+async recommend(@Body() dto: RecommendationRequestDto): Promise<Portfolio> {
+  // Only authenticated users can access
+  return this.portfolioService.buildPortfolio(dto);
+}
 ```
 
 ---
 
 ## Testing Patterns
 
-### 1. Use Fixtures for Test Data
-```python
-import pytest
+### 1. Use Jest for Unit Tests
+```typescript
+import { Test, TestingModule } from '@nestjs/testing';
+import { ZScoreCalculatorService } from './z-score-calculator.service';
 
-@pytest.fixture
-def sample_funds():
-    """Fixture: Sample fund data for testing"""
-    return [
+describe('ZScoreCalculatorService', () => {
+  let service: ZScoreCalculatorService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [ZScoreCalculatorService],
+    }).compile();
+
+    service = module.get<ZScoreCalculatorService>(ZScoreCalculatorService);
+  });
+
+  it('should calculate Z-scores correctly', () => {
+    const values = [10, 12, 14, 16, 18];
+    const mean = 14;
+    const stddev = Math.sqrt(10);
+    
+    const zScore = service['calculateZScore'](14, mean, stddev);
+    expect(zScore).toBeCloseTo(0, 2);
+  });
+
+  it('should handle zero stddev', () => {
+    const values = [10, 10, 10];
+    // Should set stddev to 1.0 to avoid division by zero
+    // Test implementation
+  });
+});
+```
+
+### 2. Mock External Dependencies
+```typescript
+import { getModelToken } from '@nestjs/mongoose';
+
+describe('PortfolioConstructionService', () => {
+  let service: PortfolioConstructionService;
+  let mockModel: any;
+
+  beforeEach(async () => {
+    mockModel = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+      updateOne: jest.fn(),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        PortfolioConstructionService,
         {
-            "fund_name": "Test Fund A",
-            "fund_category": "Large Cap Equity",
-            "five_year_cagr_equity": 13.8,
-            "sharpe_ratio": 1.12,
-            "expense_ratio_equity": 0.9
+          provide: getModelToken(MfScores.name),
+          useValue: mockModel,
         },
-        {
-            "fund_name": "Test Fund B",
-            "fund_category": "Large Cap Equity",
-            "five_year_cagr_equity": 11.5,
-            "sharpe_ratio": 0.98,
-            "expense_ratio_equity": 1.2
-        }
-    ]
+      ],
+    }).compile();
 
-def test_z_score_calculation(sample_funds):
-    calculator = ZScoreCalculator(timestamp=datetime(2025, 10, 1))
-    scores = calculator.calculate_for_category("Large Cap Equity")
+    service = module.get<PortfolioConstructionService>(PortfolioConstructionService);
+  });
+
+  it('should build portfolio successfully', async () => {
+    mockModel.find.mockResolvedValue([/* mock funds */]);
     
-    assert len(scores) == 2
-    assert abs(scores[0]["z_scores"]["five_year_cagr_equity"] - 0.707) < 0.01
-```
-
-### 2. Test Edge Cases Explicitly
-```python
-def test_z_score_with_single_fund():
-    """Should skip Z-score calculation when <3 funds"""
-    calculator = ZScoreCalculator(timestamp=datetime(2025, 10, 1))
+    const dto = {
+      riskProfile: 'Balanced Achiever',
+      monthlySip: 25000,
+    };
     
-    # Mock category with 1 fund
-    with patch.object(calculator.collection2, 'find', return_value=[{"fund_name": "Single Fund"}]):
-        scores = calculator.calculate_for_category("Tiny Category")
-        
-        assert scores == []  # Should return empty list
-
-def test_z_score_with_zero_stddev():
-    """Should handle case where all funds have same value"""
-    calculator = ZScoreCalculator(timestamp=datetime(2025, 10, 1))
-    
-    funds = [
-        {"expense_ratio_equity": 0.9},
-        {"expense_ratio_equity": 0.9},
-        {"expense_ratio_equity": 0.9}
-    ]
-    
-    # Should set stddev=1.0 to avoid division by zero
-    # All Z-scores should be 0
-    ...
-```
-
-### 3. Mock External Dependencies
-```python
-from unittest.mock import patch, MagicMock
-
-def test_bse_api_integration():
-    """Test BSE API call without hitting real API"""
-    with patch("src.bse_integration.bse_client.httpx.post") as mock_post:
-        # Mock successful response
-        mock_post.return_value = MagicMock(
-            status_code=200,
-            json=lambda: {"status": "SUCCESS", "order_id": "12345"}
-        )
-        
-        client = BSEClient()
-        response = client.register_sip(payload)
-        
-        assert response["status"] == "SUCCESS"
-        assert response["order_id"] == "12345"
+    const portfolio = await service.buildPortfolio(dto);
+    expect(portfolio.funds.length).toBeGreaterThan(0);
+  });
+});
 ```
 
 ---
 
 ## File Organization
 
-### 1. One Class Per File (Generally)
+### 1. Module Structure
 ```
-src/scoring_engine/
-├── z_score_calculator.py      # ZScoreCalculator class
-├── group_scorer.py            # GroupScorer class
-├── composite_scorer.py        # CompositeScorer class
-└── ranker.py                  # Ranker class
-```
-
-### 2. Separate Utils from Business Logic
-```
-src/utils/
-├── logger.py                  # Logging setup
-├── date_utils.py              # Date/time helpers
-└── explanation_generator.py  # "Why this fund?" text
-
-src/scoring_engine/            # Core business logic
+src/scoring-engine/
+├── scoring-engine.module.ts       # Module definition
+├── scoring-engine.service.ts      # Main service
+├── z-score-calculator.service.ts  # Sub-service
+├── group-scorer.service.ts        # Sub-service
+├── composite-scorer.service.ts    # Sub-service
+└── dto/
+    └── scoring-result.dto.ts      # Data transfer objects
 ```
 
-### 3. Config Files in JSON (Not Python)
-```python
-# ✅ GOOD - Editable without code changes
-with open("src/config/directionality.json") as f:
-    directionality = json.load(f)
+### 2. Separate Config from Code
+```typescript
+// ✅ GOOD - Config in JSON
+const directionalityConfig = JSON.parse(
+  readFileSync('src/config/json/directionality.json', 'utf-8')
+);
 
-# ❌ BAD - Hardcoded in Python
-HIGHER_IS_BETTER = [
-    "five_year_cagr_equity",
-    "sharpe_ratio",
-    ...
-]
+// ❌ BAD - Hardcoded in TypeScript
+const HIGHER_IS_BETTER = [
+  'fiveYearCagrEquity',
+  'sharpeRatio',
+  // ...
+];
 ```
 
 ---
 
 ## Performance Tips
 
-### 1. Batch Database Queries
-```python
-# ✅ GOOD - One query for all categories
-all_data = db.mf_scheme_data_monthwise.find({"timestamp": latest_timestamp})
-categories = defaultdict(list)
-for fund in all_data:
-    categories[fund["fund_category"]].append(fund)
+### 1. Use Lean Queries
+```typescript
+// ✅ GOOD - Returns plain JS objects
+const funds = await this.mfSchemeDataModel.find({ category }).lean();
 
-# ❌ BAD - One query per category (12 queries!)
-for category in all_categories:
-    funds = db.mf_scheme_data_monthwise.find({
-        "timestamp": latest_timestamp,
-        "fund_category": category
-    })
+// ❌ BAD - Returns Mongoose documents (heavier)
+const funds = await this.mfSchemeDataModel.find({ category });
 ```
 
-### 2. Use Generators for Large Datasets
-```python
-# ✅ GOOD - Generator (lazy loading)
-def iterate_funds():
-    cursor = db.mf_scheme_data_monthwise.find({})
-    for fund in cursor:
-        yield fund
-
-# ❌ BAD - Load all into memory
-funds = list(db.mf_scheme_data_monthwise.find({}))  # May be GBs!
+### 2. Use Aggregation for Complex Queries
+```typescript
+const trend = await this.mfScoresModel.aggregate([
+  { $match: { categoryName: 'Large Cap Equity' } },
+  { $unwind: '$mfDecScores' },
+  { $match: { 'mfDecScores.fundId': fundId } },
+  { $project: {
+      timestamp: 1,
+      rank: '$mfDecScores.rank',
+      score: '$mfDecScores.compositeScore',
+  }},
+  { $sort: { timestamp: 1 } },
+]);
 ```
 
 ### 3. Cache Expensive Computations
-```python
-from functools import lru_cache
+```typescript
+import { CACHE_MANAGER, Inject } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 
-@lru_cache(maxsize=128)
-def get_allocation_matrix(risk_profile: str, sip_bucket: str) -> Dict:
-    """Cached: Avoid reloading JSON file on every request"""
-    with open("src/config/allocation_matrix.json") as f:
-        matrix = json.load(f)
-    return matrix[risk_profile][sip_bucket]
+@Injectable()
+export class AllocationEngineService {
+  constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
+
+  async getAllocationMatrix(): Promise<AllocationMatrix> {
+    const cached = await this.cacheManager.get<AllocationMatrix>('allocation-matrix');
+    if (cached) return cached;
+
+    const matrix = JSON.parse(readFileSync('...', 'utf-8'));
+    await this.cacheManager.set('allocation-matrix', matrix, 3600); // 1 hour TTL
+    return matrix;
+  }
+}
 ```
 
 ---
 
 ## Security Best Practices
 
-### 1. Never Commit Secrets
-```python
-# ✅ GOOD - From environment variables
-import os
-BSE_API_KEY = os.getenv("BSE_API_KEY")
+### 1. Environment Variables
+```typescript
+// ✅ GOOD - ConfigService
+@Injectable()
+export class BseClientService {
+  constructor(private configService: ConfigService) {
+    this.apiKey = this.configService.get<string>('BSE_API_KEY');
+  }
+}
 
-# ❌ BAD - Hardcoded secret
-BSE_API_KEY = "abc123xyz456"  # NEVER DO THIS
+// ❌ BAD - Hardcoded secret
+const BSE_API_KEY = 'abc123xyz456'; // NEVER!
 ```
 
 ### 2. Validate User Inputs
-```python
-from fastapi import HTTPException
+```typescript
+// DTOs handle basic validation
+export class RecommendationRequestDto {
+  @IsNumber()
+  @Min(500)
+  @Max(1000000)
+  monthlySip: number;
+}
 
-@app.post("/api/recommend")
-async def recommend_portfolio(request: RecommendationRequest):
-    # Validate SIP amount
-    if request.monthly_sip < 500 or request.monthly_sip > 1000000:
-        raise HTTPException(
-            status_code=400,
-            detail="SIP amount must be between ₹500 and ₹10,00,000"
-        )
-    
-    # Validate risk profile
-    valid_profiles = ["Safety Seeker", "Conservative Guardian", "Balanced Achiever", "Aggressive Explorer"]
-    if request.risk_profile not in valid_profiles:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid risk_profile. Must be one of: {valid_profiles}"
-        )
-    
-    # Proceed...
+// Business logic adds extra checks
+if (dto.monthlySip < 500) {
+  throw new BadRequestException('SIP amount must be at least ₹500');
+}
 ```
 
-### 3. Use Parameterized Queries (MongoDB Injection Prevention)
-```python
-# ✅ GOOD - Parameterized
-fund = db.mf_scheme_track_record.find_one({"fund_name": user_input})
+### 3. Sanitize Database Queries
+```typescript
+// ✅ GOOD - Parameterized query
+const fund = await this.mfSchemeTrackRecordModel.findOne({ fundName: userInput });
 
-# ❌ BAD - String concatenation (open to injection)
-query = f'{{"fund_name": "{user_input}"}}'  # If user_input = '", "$where": "1==1'
-fund = db.mf_scheme_track_record.find_one(eval(query))
+// ❌ BAD - String concatenation (NoSQL injection risk)
+const query = `{ fundName: "${userInput}" }`; // If userInput = '", $where: "1==1'
+const fund = await this.mfSchemeTrackRecordModel.findOne(eval(query));
 ```
 
 ---
 
-**Last Updated**: October 6, 2025
+**Last Updated**: October 6, 2025 (Updated for NestJS)

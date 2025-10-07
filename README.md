@@ -1,5 +1,7 @@
 # 🚀 PlutoMoney Quant - AI-Powered Portfolio Allocation System
 
+**Built with NestJS + TypeScript + MongoDB**
+
 **Intelligent, Risk-Adjusted Mutual Fund Recommendations Using Quantitative Scoring**
 
 ---
@@ -13,6 +15,8 @@ PlutoMoney Quant is a sophisticated portfolio allocation algorithm that recommen
 3. **Weighting parameters by risk profile** (Safety Seeker vs Aggressive Explorer)
 4. **Constructing diversified portfolios** based on SIP amount and risk tolerance
 5. **Rebalancing monthly** to maintain optimal allocation
+
+**Tech Stack**: NestJS, TypeScript, MongoDB (Mongoose), simple-statistics, class-validator
 
 ---
 
@@ -84,60 +88,76 @@ Submit to BSE Star MFD (bse_client.py)
 
 ### 1. Prerequisites
 
-- Python 3.11+
+- Node.js 18+ (LTS recommended)
 - MongoDB 7.0+ (Atlas recommended)
 - Git
+- npm or yarn
 
 ### 2. Clone & Setup
 
 ```bash
-# Clone repository
-git clone https://github.com/yourorg/plutomoney-quant.git
-cd plutomoney-quant
+# Install NestJS CLI globally
+npm install -g @nestjs/cli
 
-# Create virtual environment
-python3.11 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Clone repository (or create new project)
+git clone https://github.com/yourorg/plutomoney-quant.git
+cd PlutoMoneyQuant
+
+# Or create new project
+# nest new PlutoMoneyQuant
 
 # Install dependencies
-pip install -r requirements.txt
+npm install
 
 # Copy environment variables
 cp .env.example .env
 # Edit .env with your MongoDB URI, BSE credentials
 ```
 
-### 3. Initialize Database
+### 3. Install Project Dependencies
 
 ```bash
-# Create MongoDB collections and indexes
-python scripts/init_db.py
+# Core dependencies
+npm install @nestjs/mongoose mongoose
+npm install @nestjs/config
+npm install class-validator class-transformer
+npm install simple-statistics
+npm install @nestjs/axios axios
+npm install @nestjs/schedule
 
-# Load sample data (optional)
-python scripts/load_sample_data.py
+# Dev dependencies
+npm install --save-dev @types/node
+npm install --save-dev @nestjs/testing
 ```
 
-### 4. Run Monthly Data Ingestion
+### 4. Run Development Server
+
+```bash
+# Start in development mode (hot reload)
+npm run start:dev
+
+# Visit http://localhost:3000/api for API
+```
+
+### 5. Run Monthly Data Ingestion (Scripts)
 
 ```bash
 # Parse Morningstar JSON and load into DB
-python scripts/monthly_ingestion.py --file data/morningstar_oct2025.json --timestamp 2025-10-01
+npm run script:ingest -- --file data/morningstar_oct2025.json --timestamp 2025-10-01
 ```
 
-### 5. Run Scoring Engine
+### 6. Run Scoring Engine
 
 ```bash
 # Calculate scores for all categories and risk profiles
-python scripts/monthly_scoring.py --timestamp 2025-10-01
+npm run script:score -- --timestamp 2025-10-01
 ```
 
-### 6. Start API Server
+### 7. Access API Documentation
 
 ```bash
-# Run FastAPI server
-uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
-
-# Visit http://localhost:8000/docs for interactive API docs
+# Swagger UI available at:
+# http://localhost:3000/api/docs
 ```
 
 ---
@@ -275,21 +295,24 @@ PlutoMoneyQuant/
 ### Run Tests
 
 ```bash
-# Run all tests with coverage
-pytest tests/ --cov=src --cov-report=html
+# Run all tests
+npm run test
 
-# Run specific test file
-pytest tests/unit/test_z_score_calculator.py -v
+# Run tests with coverage
+npm run test:cov
 
-# Run with verbose output
-pytest -vv
+# Run tests in watch mode
+npm run test:watch
+
+# Run e2e tests
+npm run test:e2e
 ```
 
 ### Coverage Report
 
 ```bash
-# Open HTML coverage report
-open htmlcov/index.html
+# Coverage report generated in /coverage directory
+# Open coverage/lcov-report/index.html in browser
 ```
 
 **Target**: ≥80% coverage on all modules

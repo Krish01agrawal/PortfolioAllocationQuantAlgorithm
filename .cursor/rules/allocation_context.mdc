@@ -117,119 +117,124 @@ For each (Risk Profile, SIP Bucket) combination:
 - Heavy equity tilt (75% equity)
 - Includes International + Small Cap (higher risk)
 
-## Portfolio Construction Logic
+## Portfolio Construction Logic (TypeScript/NestJS)
 
 ### Step 1: Determine SIP Bucket
-```python
-def get_sip_bucket(monthly_sip: int) -> str:
-    if monthly_sip < 5000:
-        return "Micro"
-    elif monthly_sip < 10000:
-        return "Ultra-Small"
-    elif monthly_sip < 20000:
-        return "Small"
-    elif monthly_sip < 35000:
-        return "Moderate"
-    elif monthly_sip < 50000:
-        return "High"
-    else:
-        return "Ultra-High"
+```typescript
+getSipBucket(monthlySip: number): string {
+  if (monthlySip < 5000) return 'Micro';
+  if (monthlySip < 10000) return 'Ultra-Small';
+  if (monthlySip < 20000) return 'Small';
+  if (monthlySip < 35000) return 'Moderate';
+  if (monthlySip < 50000) return 'High';
+  return 'Ultra-High';
+}
 ```
 
 ### Step 2: Lookup Allocation
-```python
-# Load allocation matrix
-with open("src/config/allocation_matrix.json") as f:
-    matrix = json.load(f)
+```typescript
+// Load allocation matrix (cached in service)
+const configPath = join(process.cwd(), 'src/config/json/allocation-matrix.json');
+const matrix: AllocationMatrix = JSON.parse(readFileSync(configPath, 'utf-8'));
 
-# Get allocation for (risk_profile, sip_bucket)
-allocation = matrix[risk_profile][sip_bucket]
+// Get allocation for (risk_profile, sip_bucket)
+const allocation = matrix[riskProfile][sipBucket];
 
-# Example result:
-# {
-#   "Large Cap": {"percentage": 0.20, "num_schemes": 1},
-#   "Mid Cap": {"percentage": 0.15, "num_schemes": 1},
-#   ...
-# }
+// Example result:
+// {
+//   "Large Cap": { percentage: 0.20, numSchemes: 1 },
+//   "Mid Cap": { percentage: 0.15, numSchemes: 1 },
+//   ...
+// }
 ```
 
 ### Step 3: Calculate Per-Category Amounts
-```python
-portfolio = []
-for category, config in allocation.items():
-    category_amount = monthly_sip * config["percentage"]
-    num_schemes = config["num_schemes"]
-    
-    # Get top-ranked funds from Collection 4
-    top_funds = get_top_n_funds(
-        category=category,
-        risk_profile=risk_profile,
-        n=num_schemes,
-        timestamp=latest_month
-    )
-    
-    # Split amount equally within category (default strategy)
-    per_fund_amount = category_amount / num_schemes
-    
-    for fund in top_funds:
-        portfolio.append({
-            "fund_name": fund["fund_name"],
-            "fund_id": fund["fund_id"],
-            "category": category,
-            "sip_amount": per_fund_amount,
-            "composite_score": fund["composite_score"],
-            "rank": fund["rank"]
-        })
+```typescript
+const portfolio: PortfolioItem[] = [];
+
+for (const [category, config] of Object.entries(allocation)) {
+  const categoryAmount = monthlySip * config.percentage;
+  const numSchemes = config.numSchemes;
+  
+  // Get top-ranked funds from Collection 4
+  const topFunds = await this.getTopNFunds(
+    category,
+    riskProfile,
+    numSchemes,
+    latestMonth
+  );
+  
+  // Split amount equally within category (default strategy)
+  const perFundAmount = categoryAmount / numSchemes;
+  
+  for (const fund of topFunds) {
+    portfolio.push({
+      fundName: fund.fundName,
+      fundId: fund.fundId,
+      category,
+      sipAmount: perFundAmount,
+      compositeScore: fund.compositeScore,
+      rank: fund.rank,
+    });
+  }
+}
 ```
 
 ### Step 4: Apply Constraints
 
 #### A. SIP Minimum Check
-```python
-for item in portfolio:
-    fund_minimum = get_fund_minimum(item["fund_id"])  # e.g., ₹500
+```typescript
+for (const item of portfolio) {
+  const fundMinimum = await this.getFundMinimum(item.fundId); // e.g., ₹500
+  
+  if (item.sipAmount < fundMinimum) {
+    // Strategy 1: Round up to minimum
+    const deficit = fundMinimum - item.sipAmount;
+    item.sipAmount = fundMinimum;
     
-    if item["sip_amount"] < fund_minimum:
-        # Strategy 1: Round up to minimum
-        deficit = fund_minimum - item["sip_amount"]
-        item["sip_amount"] = fund_minimum
-        
-        # Deduct deficit from highest-allocation fund
-        # (or warn user to increase SIP amount)
+    // Deduct deficit from highest-allocation fund
+    // (or warn user to increase SIP amount)
+  }
+}
 ```
 
 #### B. AMC Diversification
-```python
-# Don't pick 2+ funds from same AMC in same category
-amc_counts = defaultdict(int)
+```typescript
+// Don't pick 2+ funds from same AMC in same category
+const amcCounts = new Map<string, number>();
 
-for item in portfolio:
-    amc = get_amc(item["fund_id"])
-    
-    if amc_counts[(item["category"], amc)] >= 1:
-        # Replace with next-best fund from different AMC
-        replacement = get_next_best_fund_different_amc(
-            category=item["category"],
-            risk_profile=risk_profile,
-            excluded_amc=amc
-        )
-        item.update(replacement)
-    
-    amc_counts[(item["category"], amc)] += 1
+for (const item of portfolio) {
+  const amc = await this.getAmc(item.fundId);
+  const key = `${item.category}_${amc}`;
+  
+  if (amcCounts.get(key) >= 1) {
+    // Replace with next-best fund from different AMC
+    const replacement = await this.getNextBestFundDifferentAmc(
+      item.category,
+      riskProfile,
+      amc
+    );
+    Object.assign(item, replacement);
+  }
+  
+  amcCounts.set(key, (amcCounts.get(key) || 0) + 1);
+}
 ```
 
 #### C. Rounding & Residuals
-```python
-# Round SIP amounts to nearest ₹100
-for item in portfolio:
-    item["sip_amount"] = round(item["sip_amount"] / 100) * 100
+```typescript
+// Round SIP amounts to nearest ₹100
+for (const item of portfolio) {
+  item.sipAmount = Math.round(item.sipAmount / 100) * 100;
+}
 
-# Allocate residual to top-ranked fund
-total_allocated = sum(item["sip_amount"] for item in portfolio)
-residual = monthly_sip - total_allocated
+// Allocate residual to top-ranked fund
+const totalAllocated = portfolio.reduce((sum, item) => sum + item.sipAmount, 0);
+const residual = monthlySip - totalAllocated;
 
-if residual > 0:
-    portfolio[0]["sip_amount"] += residual  # Top fund gets extra
+if (residual > 0) {
+  portfolio[0].sipAmount += residual; // Top fund gets extra
+}
 ```
 
 ## Edge Cases
@@ -318,16 +323,19 @@ for cat, config in allocation.items():
 }
 ```
 
-## Related Files
+## Related Files (NestJS)
 
-- `src/config/allocation_matrix.json` (full matrix with all combos)
-- `src/portfolio_construction/allocation_engine.py`
-- `src/portfolio_construction/fund_selector.py`
-- `src/portfolio_construction/constraints.py`
+- `src/config/json/allocation-matrix.json` (full matrix with all combos)
+- `src/portfolio-construction/allocation-engine.service.ts`
+- `src/portfolio-construction/fund-selector.service.ts`
+- `src/portfolio-construction/constraints.service.ts`
+- `src/portfolio-construction/dto/recommendation-request.dto.ts`
+- `src/portfolio-construction/dto/portfolio-response.dto.ts`
 
 ## Common Pitfalls
 
 1. ❌ **DON'T** forget to validate matrix sums to 1.0
-2. ❌ **DON'T** pick same fund twice (use set of fund_ids)
+2. ❌ **DON'T** pick same fund twice (use Set of fund IDs)
 3. ❌ **DON'T** ignore SIP minimums (causes BSE API rejection)
 4. ❌ **DON'T** allocate <₹500 per fund (practical minimum)
+5. ❌ **DON'T** forget to await async operations (TypeScript won't catch this at compile time)

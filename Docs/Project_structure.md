@@ -1,6 +1,6 @@
 # PlutoMoney Quant - Project Structure
 
-## 📂 Directory Layout
+## 📂 Directory Layout (NestJS)
 
 ```
 PlutoMoneyQuant/
@@ -19,86 +19,101 @@ PlutoMoneyQuant/
 │   ├── Bug_tracking.md               # Known issues & fixes
 │   └── UI_UX_doc.md                  # Frontend design system
 │
-├── generate.mdc                      # Code generation guidelines
+├── generate.mdc                      # Code generation guidelines (NestJS)
 ├── workflow.mdc                      # Git workflow & conventions
 ├── PRD.md                            # Product Requirements Document
 │
-├── src/                              # Source code
-│   ├── config/                       # Configuration files
-│   │   ├── database.py               # MongoDB connection
-│   │   ├── allocation_matrix.json    # Risk × SIP → Allocation %
-│   │   ├── directionality.json       # Parameter direction config
-│   │   └── weightage.json            # Risk profile weightage config
+├── src/                              # Source code (NestJS)
+│   ├── config/                       # Configuration module
+│   │   ├── config.module.ts          # ConfigModule setup
+│   │   ├── database.config.ts        # MongoDB connection config
+│   │   └── json/                     # JSON configuration files
+│   │       ├── allocation-matrix.json    # Risk × SIP → Allocation %
+│   │       ├── directionality.json       # Parameter direction config
+│   │       └── weightage.json            # Risk profile weightage config
 │   │
-│   ├── models/                       # Data models (MongoDB schemas)
-│   │   ├── mf_scheme_track_record.py
-│   │   ├── mf_scheme_data_monthwise.py
-│   │   ├── category_score.py
-│   │   └── mf_scores.py
+│   ├── schemas/                      # Mongoose schemas
+│   │   ├── mf-scheme-track-record.schema.ts
+│   │   ├── mf-scheme-data-monthwise.schema.ts
+│   │   ├── category-score.schema.ts
+│   │   └── mf-scores.schema.ts
 │   │
-│   ├── data_ingestion/               # Morningstar data pipeline
-│   │   ├── morningstar_parser.py     # JSON parser & validator
-│   │   ├── data_loader.py            # Load into Collection 1 & 2
-│   │   └── validators.py             # Data quality checks
+│   ├── data-ingestion/               # Data ingestion module
+│   │   ├── data-ingestion.module.ts
+│   │   ├── data-ingestion.service.ts
+│   │   ├── morningstar-parser.service.ts
+│   │   └── dto/
+│   │       └── morningstar-fund.dto.ts   # DTO with validation
 │   │
-│   ├── scoring_engine/               # Core scoring logic
-│   │   ├── z_score_calculator.py     # Compute Z-scores per category
-│   │   ├── group_scorer.py           # Aggregate into 8 groups
-│   │   ├── composite_scorer.py       # Risk-weighted composite score
-│   │   └── ranker.py                 # Rank funds within category
+│   ├── scoring-engine/               # Scoring engine module
+│   │   ├── scoring-engine.module.ts
+│   │   ├── scoring-engine.service.ts
+│   │   ├── z-score-calculator.service.ts
+│   │   ├── group-scorer.service.ts
+│   │   ├── composite-scorer.service.ts
+│   │   └── ranker.service.ts
 │   │
-│   ├── portfolio_construction/       # Portfolio builder
-│   │   ├── allocation_engine.py      # Risk × SIP → Category split
-│   │   ├── fund_selector.py          # Pick top-N from each category
-│   │   ├── constraints.py            # SIP minimums, AMC diversity
-│   │   └── optimizer.py              # Equal-weight vs score-proportional
+│   ├── portfolio-construction/       # Portfolio construction module
+│   │   ├── portfolio-construction.module.ts
+│   │   ├── portfolio-construction.service.ts
+│   │   ├── allocation-engine.service.ts
+│   │   ├── fund-selector.service.ts
+│   │   ├── constraints.service.ts
+│   │   └── dto/
+│   │       ├── recommendation-request.dto.ts
+│   │       └── portfolio-response.dto.ts
 │   │
-│   ├── bse_integration/              # BSE Star MFD API
-│   │   ├── trade_generator.py        # Create SIP trade list
-│   │   └── bse_client.py             # HTTP client for BSE API
+│   ├── bse-integration/              # BSE Star MFD API module
+│   │   ├── bse-integration.module.ts
+│   │   ├── bse-client.service.ts
+│   │   ├── trade-generator.service.ts
+│   │   └── dto/
+│   │       └── bse-sip-registration.dto.ts
 │   │
-│   ├── rebalancing/                  # Monthly rebalancing logic
-│   │   ├── drift_detector.py         # Detect score/allocation drift
-│   │   └── rebalancing_engine.py     # Generate switch recommendations
+│   ├── rebalancing/                  # Rebalancing module
+│   │   ├── rebalancing.module.ts
+│   │   ├── rebalancing.service.ts
+│   │   └── drift-detector.service.ts
 │   │
-│   ├── api/                          # REST API (FastAPI/Flask)
-│   │   ├── routes/
-│   │   │   ├── recommendation.py     # POST /api/recommend
-│   │   │   ├── portfolio.py          # GET /api/portfolio/{user_id}
-│   │   │   └── rebalancing.py        # GET /api/rebalancing/{user_id}
-│   │   ├── middleware/
-│   │   │   ├── auth.py               # JWT authentication
-│   │   │   └── rate_limiter.py       # API rate limiting
-│   │   └── app.py                    # FastAPI app entrypoint
+│   ├── recommendation/               # Recommendation controller
+│   │   └── recommendation.controller.ts
 │   │
-│   └── utils/                        # Shared utilities
-│       ├── logger.py                 # Structured logging
-│       ├── date_utils.py             # Month-end calculations
-│       └── explanation_generator.py  # "Why this fund?" text
+│   ├── portfolio/                    # Portfolio controller
+│   │   └── portfolio.controller.ts
+│   │
+│   ├── common/                       # Shared utilities
+│   │   ├── decorators/
+│   │   ├── filters/
+│   │   ├── guards/
+│   │   │   └── jwt-auth.guard.ts
+│   │   └── utils/
+│   │       ├── logger.util.ts
+│   │       ├── date.util.ts
+│   │       └── explanation-generator.util.ts
+│   │
+│   ├── app.module.ts                 # Root module
+│   └── main.ts                       # Application entry point
 │
 ├── scripts/                          # Automation scripts
-│   ├── monthly_ingestion.py          # Cron: Morningstar data fetch
-│   ├── monthly_scoring.py            # Cron: Run scoring engine
-│   └── db_migration.py               # Database schema updates
+│   ├── monthly-ingestion.ts          # Cron: Morningstar data fetch
+│   ├── monthly-scoring.ts            # Cron: Run scoring engine
+│   └── db-migration.ts               # Database schema updates
 │
-├── tests/                            # Unit & integration tests
+├── test/                             # Unit & integration tests (Jest)
 │   ├── unit/
-│   │   ├── test_z_score_calculator.py
-│   │   ├── test_group_scorer.py
-│   │   └── test_allocation_engine.py
-│   ├── integration/
-│   │   ├── test_end_to_end_flow.py
-│   │   └── test_bse_integration.py
+│   │   ├── z-score-calculator.service.spec.ts
+│   │   ├── group-scorer.service.spec.ts
+│   │   └── allocation-engine.service.spec.ts
+│   ├── e2e/
+│   │   ├── recommendation.e2e-spec.ts
+│   │   └── portfolio.e2e-spec.ts
 │   └── fixtures/
-│       ├── sample_morningstar_data.json
-│       └── sample_allocation_matrix.json
+│       ├── sample-morningstar-data.json
+│       └── sample-allocation-matrix.json
 │
-├── notebooks/                        # Jupyter notebooks (exploration)
-│   ├── 01_data_exploration.ipynb     # Analyze Morningstar data
-│   ├── 02_scoring_validation.ipynb   # Validate Z-score logic
-│   └── 03_backtest_portfolios.ipynb  # Historical performance tests
-│
-├── requirements.txt                  # Python dependencies
+├── package.json                      # npm dependencies & scripts
+├── tsconfig.json                     # TypeScript configuration
+├── nest-cli.json                     # NestJS CLI configuration
 ├── .env.example                      # Environment variables template
 ├── .gitignore                        # Git ignore rules
 └── README.md                         # Quick start guide
@@ -126,25 +141,29 @@ PlutoMoneyQuant/
 ## 🔧 Technology Stack
 
 ### **Backend**
-- **Language**: Python 3.11+
-- **Framework**: FastAPI (async REST API)
+- **Language**: TypeScript 5.0+
+- **Framework**: NestJS 10+ (modular, scalable architecture)
 - **Database**: MongoDB 7.0+ (Atlas recommended)
-- **ORM/ODM**: Motor (async MongoDB driver) + Pydantic (data validation)
-- **Scheduler**: APScheduler (monthly cron jobs)
+- **ODM**: Mongoose 8+ (schema validation, middleware)
+- **Scheduler**: @nestjs/schedule (monthly cron jobs)
 
 ### **Data Processing**
-- **Pandas**: DataFrame operations for scoring
-- **NumPy**: Statistical calculations (mean, stddev, Z-scores)
-- **SciPy**: Advanced statistical functions
+- **simple-statistics**: Statistical calculations (mean, stddev, Z-scores)
+- **lodash**: Utility functions for data manipulation
+
+### **Validation & Transformation**
+- **class-validator**: DTO validation with decorators
+- **class-transformer**: Plain object to class transformation
+- **@nestjs/swagger**: Auto-generated API documentation
 
 ### **API Integration**
-- **HTTPX**: Async HTTP client for BSE API
-- **Pydantic**: Request/response validation
+- **@nestjs/axios**: HTTP client wrapper for BSE API
+- **axios**: Promise-based HTTP client
 
 ### **DevOps**
-- **Logging**: Python `logging` + Loguru (structured logs)
+- **Logging**: Built-in NestJS Logger (contextual logging)
 - **Monitoring**: Prometheus + Grafana (optional)
-- **Testing**: Pytest + Coverage.py
+- **Testing**: Jest + @nestjs/testing
 - **CI/CD**: GitHub Actions (auto-deploy to production)
 
 ### **Frontend** (Future)

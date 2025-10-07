@@ -1,8 +1,8 @@
-# PlutoMoney Quant - Step-by-Step Implementation Guide
+# PlutoMoney Quant - Step-by-Step Implementation Guide (NestJS)
 
 ## 🎯 Overview
 
-This guide walks you through building the entire system from scratch. Each step includes:
+This guide walks you through building the entire system from scratch using **NestJS + TypeScript + MongoDB**. Each step includes:
 - **What** we're building
 - **Why** it's designed this way
 - **How** to implement it (with code examples)
@@ -12,10 +12,10 @@ This guide walks you through building the entire system from scratch. Each step 
 ## 📋 Prerequisites
 
 ### **System Requirements**
-- Python 3.11+
+- Node.js 18+ (LTS recommended)
 - MongoDB 7.0+ (local or Atlas)
 - Git
-- VS Code with Python extension
+- VS Code with TypeScript/NestJS extensions
 
 ### **MongoDB Atlas Setup** (Recommended)
 1. Create free cluster at [mongodb.com/cloud/atlas](https://mongodb.com/cloud/atlas)
@@ -27,103 +27,120 @@ This guide walks you through building the entire system from scratch. Each step 
 
 ## 🏗️ Phase 1: Project Foundation (Week 1)
 
-### **Step 1.1: Initialize Project**
+### **Step 1.1: Initialize NestJS Project**
 
 ```bash
-# Create project directory
-mkdir PlutoMoneyQuant
+# Install NestJS CLI globally
+npm install -g @nestjs/cli
+
+# Create new project
+nest new PlutoMoneyQuant
+# Choose npm or yarn as package manager
+
 cd PlutoMoneyQuant
 
-# Initialize Git
+# Initialize Git (if not already initialized)
 git init
 git branch -M main
 
-# Create virtual environment
-python3.11 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Create .gitignore
+# Create .gitignore (NestJS includes this by default, but verify)
 cat > .gitignore << EOF
-venv/
-__pycache__/
-*.pyc
+node_modules/
+dist/
 .env
-.DS_Store
+.env.local
 *.log
-.pytest_cache/
-.coverage
-htmlcov/
+.DS_Store
+coverage/
+.vscode/
+*.swp
 EOF
 ```
 
-**Why virtual environment?**  
-Isolates dependencies from your system Python, prevents version conflicts.
+**Why NestJS?**  
+- **TypeScript-first**: Type safety, better refactoring, IDE support
+- **Modular architecture**: Perfect for scoring engine, portfolio construction as separate modules
+- **Dependency Injection**: Cleaner code, easier testing
+- **Decorators**: Clean API routes, validation, pipes
 
 ---
 
 ### **Step 1.2: Install Dependencies**
 
 ```bash
-# Create requirements.txt
-cat > requirements.txt << EOF
-# Core Framework
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-pydantic==2.5.3
-pydantic-settings==2.1.0
+# Install core NestJS dependencies
+npm install --save @nestjs/common @nestjs/core @nestjs/platform-express
 
-# Database
-motor==3.3.2              # Async MongoDB driver
-pymongo==4.6.1            # Sync MongoDB driver (for scripts)
+# Install MongoDB (Mongoose)
+npm install --save @nestjs/mongoose mongoose
 
-# Data Processing
-pandas==2.2.0
-numpy==1.26.3
-scipy==1.12.0
+# Install configuration
+npm install --save @nestjs/config
 
-# HTTP Client
-httpx==0.26.0
+# Install validation
+npm install --save class-validator class-transformer
 
-# Scheduling
-apscheduler==3.10.4
+# Install utilities
+npm install --save @nestjs/axios axios
+npm install --save @nestjs/schedule  # For cron jobs
+npm install --save lodash
+npm install --save moment-timezone
 
-# Utilities
-python-dotenv==1.0.0
-loguru==0.7.2
-python-jose[cryptography]==3.3.0  # JWT tokens
-passlib[bcrypt]==1.7.4            # Password hashing
+# Install statistics library (for Z-scores)
+npm install --save simple-statistics
 
-# Testing
-pytest==7.4.4
-pytest-asyncio==0.23.3
-pytest-cov==4.1.0
-faker==22.0.0             # Generate test data
-
-# Development
-black==24.1.1             # Code formatter
-ruff==0.1.14              # Linter
-ipython==8.20.0
-ipykernel==6.29.0         # For Jupyter notebooks
-EOF
-
-# Install all dependencies
-pip install -r requirements.txt
+# Install development dependencies
+npm install --save-dev @types/node @types/lodash
+npm install --save-dev @nestjs/testing
+npm install --save-dev jest @types/jest ts-jest
+npm install --save-dev eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin
+npm install --save-dev prettier eslint-config-prettier eslint-plugin-prettier
 ```
 
 **Dependency breakdown**:
-- **FastAPI**: Modern, fast web framework (async support)
-- **Motor**: Async MongoDB driver (non-blocking DB queries)
-- **Pandas/NumPy**: Z-score calculations, data manipulation
-- **APScheduler**: Monthly cron jobs (data ingestion + scoring)
+- **@nestjs/mongoose**: MongoDB integration with Mongoose ODM
+- **class-validator**: DTO validation (like Pydantic)
+- **@nestjs/schedule**: Cron jobs for monthly data ingestion/scoring
+- **simple-statistics**: Statistical functions (mean, stddev, Z-scores)
+- **@nestjs/axios**: HTTP client for BSE API integration
 
 ---
 
-### **Step 1.3: Create Directory Structure**
+### **Step 1.3: Create NestJS Module Structure**
 
 ```bash
-mkdir -p src/{config,models,data_ingestion,scoring_engine,portfolio_construction,bse_integration,rebalancing,api/{routes,middleware},utils}
-mkdir -p scripts tests/{unit,integration,fixtures} notebooks Docs .cursor/rules
+# NestJS uses a modular structure - generate modules using CLI
+
+# Generate core modules
+nest generate module config
+nest generate module data-ingestion
+nest generate module scoring-engine
+nest generate module portfolio-construction
+nest generate module bse-integration
+nest generate module rebalancing
+
+# Generate services
+nest generate service data-ingestion
+nest generate service scoring-engine/z-score-calculator
+nest generate service scoring-engine/group-scorer
+nest generate service scoring-engine/composite-scorer
+nest generate service portfolio-construction/allocation-engine
+nest generate service portfolio-construction/fund-selector
+
+# Generate controllers
+nest generate controller recommendation
+nest generate controller portfolio
+nest generate controller rebalancing
+
+# Create additional directories
+mkdir -p src/schemas
+mkdir -p src/config/json
+mkdir -p src/common/{decorators,filters,guards,utils}
+mkdir -p test/unit test/integration test/fixtures
 ```
+
+**Why NestJS CLI?**  
+Automatically sets up boilerplate, updates module imports, follows best practices.
 
 ---
 
@@ -133,117 +150,119 @@ mkdir -p scripts tests/{unit,integration,fixtures} notebooks Docs .cursor/rules
 # Create .env file
 cat > .env << EOF
 # MongoDB
-MONGODB_URI=mongodb+srv://youruser:yourpass@cluster.mongodb.net/
-MONGODB_DATABASE=plutomoney_quant
+MONGODB_URI=mongodb+srv://youruser:yourpass@cluster.mongodb.net/plutomoney_quant
 
-# BSE Star MFD API (get credentials from BSE)
+# BSE Star MFD API
 BSE_API_URL=https://bsestarmf.in/RTPService
 BSE_MEMBER_CODE=12345
 BSE_USER_ID=youruser
 BSE_PASSWORD=yourpass
 
 # Application
-ENV=development
-LOG_LEVEL=DEBUG
-SECRET_KEY=dev-secret-key-change-in-production
+NODE_ENV=development
+PORT=3000
+LOG_LEVEL=debug
 
-# Scheduler
+# JWT Secret
+JWT_SECRET=dev-secret-key-change-in-production
+
+# Scheduler (Cron)
 MONTHLY_INGESTION_DAY=1
 MONTHLY_INGESTION_HOUR=6
 EOF
 
 # Create .env.example (for Git - no secrets)
 cp .env .env.example
-# Manually replace real values with placeholders in .env.example
+# Manually replace real values with placeholders
 ```
 
 **Security note**: `.env` is in `.gitignore` (never commit secrets!).
 
 ---
 
-### **Step 1.5: Database Connection**
+### **Step 1.5: Database Configuration Module**
 
-**File**: `src/config/database.py`
+**File**: `src/config/database.config.ts`
 
-```python
-"""
-MongoDB connection using Motor (async driver).
-Singleton pattern ensures one connection pool for entire app.
-"""
+```typescript
+import { ConfigService } from '@nestjs/config';
+import { MongooseModuleOptions } from '@nestjs/mongoose';
 
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
-from pymongo import MongoClient
-from pydantic_settings import BaseSettings
-import os
-from dotenv import load_dotenv
+export const getDatabaseConfig = (
+  configService: ConfigService,
+): MongooseModuleOptions => {
+  const uri = configService.get<string>('MONGODB_URI');
+  
+  if (!uri) {
+    throw new Error('MONGODB_URI is not defined in environment variables');
+  }
 
-load_dotenv()
-
-class Settings(BaseSettings):
-    """
-    Environment variables loaded from .env file.
-    Pydantic validates types and provides defaults.
-    """
-    mongodb_uri: str
-    mongodb_database: str
-    env: str = "development"
-    log_level: str = "INFO"
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
-
-settings = Settings()
-
-# Async client for FastAPI routes
-async_client: AsyncIOMotorClient = None
-async_db: AsyncIOMotorDatabase = None
-
-# Sync client for scripts (monthly ingestion)
-sync_client: MongoClient = None
-sync_db = None
-
-async def connect_db():
-    """
-    Initialize async MongoDB connection.
-    Called once on FastAPI startup.
-    """
-    global async_client, async_db
-    async_client = AsyncIOMotorClient(settings.mongodb_uri)
-    async_db = async_client[settings.mongodb_database]
-    print(f"✅ Connected to MongoDB: {settings.mongodb_database}")
-
-async def close_db():
-    """
-    Close MongoDB connection pool.
-    Called on FastAPI shutdown.
-    """
-    global async_client
-    if async_client:
-        async_client.close()
-        print("❌ Closed MongoDB connection")
-
-def get_sync_db():
-    """
-    Get synchronous MongoDB connection.
-    Used in scheduled scripts (APScheduler).
-    """
-    global sync_client, sync_db
-    if not sync_client:
-        sync_client = MongoClient(settings.mongodb_uri)
-        sync_db = sync_client[settings.mongodb_database]
-    return sync_db
-
-# Helper to get async database instance
-def get_db() -> AsyncIOMotorDatabase:
-    return async_db
+  return {
+    uri,
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    retryWrites: true,
+    w: 'majority',
+    // Connection pool settings
+    maxPoolSize: 10,
+    minPoolSize: 5,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
+  };
+};
 ```
 
-**Why async?**  
-FastAPI is async-first. Async DB queries free up the server to handle other requests while waiting for MongoDB.
+**File**: `src/config/config.module.ts`
 
-**Why sync client too?**  
-APScheduler runs in background threads. Motor (async) doesn't play well with threads; use `pymongo` (sync) instead.
+```typescript
+import { Module } from '@nestjs/common';
+import { ConfigModule as NestConfigModule } from '@nestjs/config';
+import { MongooseModule } from '@nestjs/mongoose';
+import { getDatabaseConfig } from './database.config';
+
+@Module({
+  imports: [
+    // Load environment variables
+    NestConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
+    }),
+    // Setup MongoDB connection
+    MongooseModule.forRootAsync({
+      useFactory: getDatabaseConfig,
+      inject: [ConfigService],
+    }),
+  ],
+  exports: [NestConfigModule, MongooseModule],
+})
+export class ConfigModule {}
+```
+
+**File**: `src/app.module.ts` (update root module)
+
+```typescript
+import { Module } from '@nestjs/common';
+import { ConfigModule } from './config/config.module';
+import { DataIngestionModule } from './data-ingestion/data-ingestion.module';
+import { ScoringEngineModule } from './scoring-engine/scoring-engine.module';
+import { PortfolioConstructionModule } from './portfolio-construction/portfolio-construction.module';
+
+@Module({
+  imports: [
+    ConfigModule,  // Import first for global config access
+    DataIngestionModule,
+    ScoringEngineModule,
+    PortfolioConstructionModule,
+  ],
+})
+export class AppModule {}
+```
+
+**Why MongooseModule.forRootAsync?**  
+Allows injecting ConfigService to read environment variables before connecting.
+
+**Why connection pool settings?**  
+Optimizes concurrent requests, prevents connection exhaustion.
 
 ---
 
@@ -443,219 +462,396 @@ APScheduler runs in background threads. Motor (async) doesn't play well with thr
 
 ---
 
-## 🗄️ Phase 2: Data Models (Week 1)
+## 🗄️ Phase 2: Mongoose Schemas (Week 1)
 
-### **Step 2.1: Pydantic Models**
+### **Step 2.1: Mongoose Schema for Collection 1**
 
-**File**: `src/models/mf_scheme_track_record.py`
+**File**: `src/schemas/mf-scheme-track-record.schema.ts`
 
-```python
-"""
-Pydantic model for Collection 1: mf_scheme_track_record
-Validates data structure before inserting into MongoDB.
-"""
+```typescript
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types } from 'mongoose';
 
-from pydantic import BaseModel, Field
-from typing import List, Optional
-from datetime import datetime
-from bson import ObjectId
+/**
+ * Embedded subdocument for monthly data references
+ */
+@Schema({ _id: false })
+export class SchemeMonthTrack {
+  @Prop({ required: true, type: Date })
+  timestamp: Date;
 
-class PyObjectId(ObjectId):
-    """
-    Custom type for MongoDB ObjectId in Pydantic.
-    Allows auto-generation of IDs.
-    """
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
-    
-    @classmethod
-    def validate(cls, v):
-        if not ObjectId.is_valid(v):
-            raise ValueError("Invalid ObjectId")
-        return ObjectId(v)
-    
-    @classmethod
-    def __get_pydantic_json_schema__(cls, core_schema, handler):
-        return {'type': 'string'}
+  @Prop({ required: true, type: Types.ObjectId, ref: 'MfSchemeDataMonthwise' })
+  mfDataId: Types.ObjectId;
+}
 
-class SchemeMonthTrack(BaseModel):
-    """Embedded document: Reference to monthly data snapshot"""
-    timestamp: datetime
-    mfDataId: PyObjectId
+export const SchemeMonthTrackSchema = SchemaFactory.createForClass(SchemeMonthTrack);
 
-class MFSchemeTrackRecord(BaseModel):
-    """
-    Master fund registry.
-    Each fund has one document here (never deleted, only status changes).
-    """
-    id: Optional[PyObjectId] = Field(alias="_id", default=None)
-    fund_name: str
-    amc: str
-    scheme_code: str  # BSE/AMFI scheme code
-    isin: Optional[str] = None
-    plan: str = "Regular"  # Regular | Direct
-    option: str = "Growth"  # Growth | IDCW
-    inception_date: Optional[datetime] = None
-    status: str = "Active"  # Active | Closed | Merged
-    schemeMonthTrackList: List[SchemeMonthTrack] = []
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    
-    class Config:
-        populate_by_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
+/**
+ * Collection 1: Master fund registry
+ * One document per fund (never deleted, only status changes)
+ */
+@Schema({ collection: 'mfSchemeTrackRecord', timestamps: true })
+export class MfSchemeTrackRecord extends Document {
+  @Prop({ required: true, index: true })
+  fundName: string;
 
-# Similar models for Collection 2, 3, 4...
+  @Prop({ required: true, index: true })
+  amc: string;
+
+  @Prop({ required: true, unique: true, index: true })
+  schemeCode: string;
+
+  @Prop()
+  isin?: string;
+
+  @Prop({ default: 'Regular', enum: ['Regular', 'Direct'] })
+  plan: string;
+
+  @Prop({ default: 'Growth', enum: ['Growth', 'IDCW'] })
+  option: string;
+
+  @Prop({ type: Date })
+  inceptionDate?: Date;
+
+  @Prop({ default: 'Active', enum: ['Active', 'Closed', 'Merged'] })
+  status: string;
+
+  @Prop({ type: [SchemeMonthTrackSchema], default: [] })
+  schemeMonthTrackList: SchemeMonthTrack[];
+}
+
+export const MfSchemeTrackRecordSchema = SchemaFactory.createForClass(MfSchemeTrackRecord);
+
+// Add indexes after schema creation
+MfSchemeTrackRecordSchema.index({ fundName: 1 });
+MfSchemeTrackRecordSchema.index({ amc: 1 });
+MfSchemeTrackRecordSchema.index({ schemeCode: 1 }, { unique: true });
 ```
 
-**Why Pydantic?**  
-- Type validation (catches errors before DB insertion)
-- Auto-documentation (FastAPI generates OpenAPI schema)
-- JSON serialization (ObjectId → string)
+**Why Mongoose decorators?**  
+- **@Schema()**: Defines MongoDB collection
+- **@Prop()**: Defines field with type validation
+- **SchemaFactory**: Generates Mongoose schema from class
+- **Document**: Adds _id, timestamps, Mongoose methods
 
 ---
 
-*(Continue with models for Collections 2, 3, 4 - similar structure)*
+### **Step 2.2: Mongoose Schema for Collection 2**
+
+**File**: `src/schemas/mf-scheme-data-monthwise.schema.ts`
+
+```typescript
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types } from 'mongoose';
+
+/**
+ * Collection 2: Monthly snapshots of fund parameters
+ * Grows monthly (1,800 docs/month)
+ */
+@Schema({ collection: 'mfSchemeDataMonthwise', timestamps: { createdAt: true, updatedAt: false } })
+export class MfSchemeDataMonthwise extends Document {
+  @Prop({ required: true, index: true, type: Date })
+  timestamp: Date;
+
+  @Prop({ required: true, type: Types.ObjectId, ref: 'MfSchemeTrackRecord', index: true })
+  fundId: Types.ObjectId;
+
+  @Prop({ required: true })
+  fundName: string;
+
+  @Prop({ required: true, index: true })
+  fundCategory: string;
+
+  // A. Quantitative Parameters (17 metrics)
+  @Prop({ type: Number })
+  fiveYearCagrEquity?: number;
+
+  @Prop({ type: Number })
+  fiveYearCagrDebtHybrid?: number;
+
+  @Prop({ type: Number })
+  threeYearRollingConsistency?: number;
+
+  @Prop({ type: Number })
+  sharpeRatio?: number;
+
+  @Prop({ type: Number })
+  sortinoRatio?: number;
+
+  @Prop({ type: Number })
+  alpha?: number;
+
+  @Prop({ type: Number })
+  beta?: number;
+
+  @Prop({ type: Number })
+  stdDevEquity?: number;
+
+  @Prop({ type: Number })
+  stdDevDebtHybrid?: number;
+
+  @Prop({ type: Number })
+  maxDrawdown?: number;
+
+  @Prop({ type: Number })
+  recoveryPeriod?: number;
+
+  @Prop({ type: Number })
+  downsideCaptureRatio?: number;
+
+  @Prop({ type: Number })
+  expenseRatioEquity?: number;
+
+  @Prop({ type: Number })
+  expenseRatioDebt?: number;
+
+  @Prop({ type: Number })
+  aumEquity?: number;
+
+  @Prop({ type: Number })
+  aumDebt?: number;
+
+  @Prop({ type: Number, min: 1, max: 5 })
+  liquidityRisk?: number;
+
+  @Prop({ type: Number })
+  portfolioTurnoverRatio?: number;
+
+  @Prop({ type: Number, min: 1, max: 5 })
+  concentrationSectorFit?: number;
+
+  @Prop({ type: Number, min: 1, max: 5 })
+  styleFit?: number;
+
+  // B. Qualitative Parameters (5 metrics)
+  @Prop({ type: Number, min: 1, max: 5 })
+  fundHouseReputation?: number;
+
+  @Prop({ type: Number })
+  fundManagerTenure?: number;
+
+  @Prop({ type: Number, min: 1, max: 5 })
+  fundManagerTrackRecord?: number;
+
+  @Prop({ type: Number, min: 1, max: 5 })
+  amcRiskManagement?: number;
+
+  @Prop({ type: Number, min: 1, max: 5 })
+  esgGovernance?: number;
+
+  // C. Forward-Looking Parameters (5 metrics)
+  @Prop({ type: Number, min: 1, max: 5 })
+  benchmarkConsistency?: number;
+
+  @Prop({ type: Number, min: 1, max: 5 })
+  peerComparison?: number;
+
+  @Prop({ type: Number, min: 1, max: 5 })
+  taxEfficiency?: number;
+
+  @Prop({ type: Number, min: 1, max: 5 })
+  fundInnovation?: number;
+
+  @Prop({ type: Number, min: 1, max: 5 })
+  forwardRiskMitigation?: number;
+}
+
+export const MfSchemeDataMonthwiseSchema = SchemaFactory.createForClass(MfSchemeDataMonthwise);
+
+// Compound indexes for common queries
+MfSchemeDataMonthwiseSchema.index({ timestamp: -1, fundId: 1 });
+MfSchemeDataMonthwiseSchema.index({ fundCategory: 1, timestamp: -1 });
+```
+
+**Why nullable fields (?):**  
+Not all funds have all parameters (e.g., equity funds won't have debt metrics).
 
 ---
 
 ## 📊 Phase 3: Data Ingestion (Week 2)
 
-### **Step 3.1: Morningstar JSON Parser**
+### **Step 3.1: Morningstar JSON Parser Service**
 
-**File**: `src/data_ingestion/morningstar_parser.py`
+**File**: `src/data-ingestion/dto/morningstar-fund.dto.ts`
 
-```python
-"""
-Parse Morningstar JSON feed and validate data quality.
-Handles missing values, outliers, and schema mismatches.
-"""
+```typescript
+import { IsString, IsNumber, IsOptional, Min, Max, IsEnum } from 'class-validator';
 
-import json
-from typing import List, Dict, Any
-from datetime import datetime
-from loguru import logger
+/**
+ * DTO for validating Morningstar fund data
+ */
+export class MorningstarFundDto {
+  @IsString()
+  fundName: string;
 
-class MorningstarParser:
-    """
-    Validates and normalizes Morningstar JSON data.
-    """
-    
-    REQUIRED_FIELDS = [
-        "fund_name",
-        "fund_category",
-        "five_year_cagr_equity",  # At least one CAGR required
-        "sharpe_ratio",
-        "expense_ratio_equity"
-    ]
-    
-    def __init__(self, json_path: str):
-        self.json_path = json_path
-        self.raw_data = []
-        self.validated_data = []
-        self.errors = []
-    
-    def load_json(self) -> List[Dict[str, Any]]:
-        """Load JSON file from path"""
-        try:
-            with open(self.json_path, 'r') as f:
-                self.raw_data = json.load(f)
-            logger.info(f"✅ Loaded {len(self.raw_data)} schemes from {self.json_path}")
-            return self.raw_data
-        except FileNotFoundError:
-            logger.error(f"❌ File not found: {self.json_path}")
-            raise
-        except json.JSONDecodeError as e:
-            logger.error(f"❌ Invalid JSON: {e}")
-            raise
-    
-    def validate_schema(self, fund_data: Dict[str, Any]) -> bool:
-        """
-        Check if fund has minimum required fields.
-        Missing optional fields are allowed (will be null in DB).
-        """
-        missing_fields = []
-        for field in self.REQUIRED_FIELDS:
-            # Check if field exists AND is not null
-            if field not in fund_data or fund_data[field] is None:
-                missing_fields.append(field)
-        
-        if missing_fields:
-            error = f"Fund '{fund_data.get('fund_name', 'Unknown')}' missing: {missing_fields}"
-            self.errors.append(error)
-            logger.warning(f"⚠️ {error}")
-            return False
-        
-        return True
-    
-    def detect_outliers(self, fund_data: Dict[str, Any]) -> bool:
-        """
-        Flag suspicious values (e.g., CAGR > 100%, negative AUM).
-        Don't reject, just log warnings.
-        """
-        outliers = []
-        
-        # CAGR sanity check (-50% to +100%)
-        if fund_data.get("five_year_cagr_equity"):
-            cagr = fund_data["five_year_cagr_equity"]
-            if cagr < -50 or cagr > 100:
-                outliers.append(f"CAGR={cagr}% (unusual)")
-        
-        # Expense ratio (0.1% to 3%)
-        if fund_data.get("expense_ratio_equity"):
-            er = fund_data["expense_ratio_equity"]
-            if er < 0.1 or er > 3:
-                outliers.append(f"Expense={er}% (unusual)")
-        
-        # AUM (must be positive)
-        if fund_data.get("aum_equity"):
-            aum = fund_data["aum_equity"]
-            if aum <= 0:
-                outliers.append(f"AUM={aum} (negative?)")
-        
-        if outliers:
-            logger.warning(f"⚠️ Outliers in '{fund_data['fund_name']}': {outliers}")
-        
-        return len(outliers) == 0
-    
-    def parse(self) -> List[Dict[str, Any]]:
-        """
-        Main parsing function.
-        Returns list of validated fund data.
-        """
-        self.load_json()
-        
-        for idx, fund in enumerate(self.raw_data):
-            # Skip if validation fails
-            if not self.validate_schema(fund):
-                continue
-            
-            # Detect outliers (but don't reject)
-            self.detect_outliers(fund)
-            
-            # Add metadata
-            fund['parsed_at'] = datetime.utcnow()
-            fund['data_source'] = 'Morningstar'
-            
-            self.validated_data.append(fund)
-        
-        logger.info(f"✅ Validated {len(self.validated_data)}/{len(self.raw_data)} schemes")
-        if self.errors:
-            logger.error(f"❌ {len(self.errors)} validation errors")
-        
-        return self.validated_data
+  @IsString()
+  fundCategory: string;
 
-# Usage example:
-# parser = MorningstarParser("data/morningstar_oct2025.json")
-# valid_funds = parser.parse()
+  @IsOptional()
+  @IsNumber()
+  fiveYearCagrEquity?: number;
+
+  @IsOptional()
+  @IsNumber()
+  fiveYearCagrDebtHybrid?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  threeYearRollingConsistency?: number;
+
+  @IsOptional()
+  @IsNumber()
+  sharpeRatio?: number;
+
+  @IsOptional()
+  @IsNumber()
+  sortinoRatio?: number;
+
+  @IsOptional()
+  @IsNumber()
+  alpha?: number;
+
+  @IsOptional()
+  @IsNumber()
+  beta?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  expenseRatioEquity?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  expenseRatioDebt?: number;
+
+  // ... all 27 parameters with validation rules
+}
+```
+
+**File**: `src/data-ingestion/morningstar-parser.service.ts`
+
+```typescript
+import { Injectable, Logger } from '@nestjs/common';
+import { readFileSync } from 'fs';
+import { validate } from 'class-validator';
+import { plainToClass } from 'class-transformer';
+import { MorningstarFundDto } from './dto/morningstar-fund.dto';
+
+@Injectable()
+export class MorningstarParserService {
+  private readonly logger = new Logger(MorningstarParserService.name);
+  
+  private readonly REQUIRED_FIELDS = [
+    'fundName',
+    'fundCategory',
+    'sharpeRatio',
+    'expenseRatioEquity',
+  ];
+
+  /**
+   * Load and parse Morningstar JSON file
+   */
+  async parseJsonFile(filePath: string): Promise<MorningstarFundDto[]> {
+    try {
+      const rawData = JSON.parse(readFileSync(filePath, 'utf-8'));
+      this.logger.log(`✅ Loaded ${rawData.length} schemes from ${filePath}`);
+      
+      const validatedFunds: MorningstarFundDto[] = [];
+      const errors: string[] = [];
+
+      for (const fund of rawData) {
+        // Validate schema
+        if (!this.validateSchema(fund)) {
+          errors.push(`Fund '${fund.fundName || 'Unknown'}' missing required fields`);
+          continue;
+        }
+
+        // Transform to DTO
+        const fundDto = plainToClass(MorningstarFundDto, fund);
+        
+        // Validate with class-validator
+        const validationErrors = await validate(fundDto);
+        if (validationErrors.length > 0) {
+          errors.push(`Fund '${fund.fundName}': ${validationErrors.map(e => e.toString()).join(', ')}`);
+          continue;
+        }
+
+        // Detect outliers (log warnings, don't reject)
+        this.detectOutliers(fundDto);
+        
+        validatedFunds.push(fundDto);
+      }
+
+      this.logger.log(`✅ Validated ${validatedFunds.length}/${rawData.length} schemes`);
+      if (errors.length > 0) {
+        this.logger.error(`❌ ${errors.length} validation errors:\n${errors.join('\n')}`);
+      }
+
+      return validatedFunds;
+    } catch (error) {
+      this.logger.error(`❌ Failed to parse JSON: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Validate required fields are present
+   */
+  private validateSchema(fund: any): boolean {
+    const missingFields = this.REQUIRED_FIELDS.filter(
+      field => !(field in fund) || fund[field] === null || fund[field] === undefined
+    );
+    
+    if (missingFields.length > 0) {
+      this.logger.warn(`⚠️ Fund '${fund.fundName || 'Unknown'}' missing: ${missingFields.join(', ')}`);
+      return false;
+    }
+    
+    return true;
+  }
+
+  /**
+   * Detect outliers (log warnings, don't reject)
+   */
+  private detectOutliers(fund: MorningstarFundDto): void {
+    const outliers: string[] = [];
+
+    // CAGR sanity check (-50% to +100%)
+    if (fund.fiveYearCagrEquity !== undefined) {
+      if (fund.fiveYearCagrEquity < -50 || fund.fiveYearCagrEquity > 100) {
+        outliers.push(`CAGR=${fund.fiveYearCagrEquity}% (unusual)`);
+      }
+    }
+
+    // Expense ratio (0.1% to 3%)
+    if (fund.expenseRatioEquity !== undefined) {
+      if (fund.expenseRatioEquity < 0.1 || fund.expenseRatioEquity > 3) {
+        outliers.push(`Expense=${fund.expenseRatioEquity}% (unusual)`);
+      }
+    }
+
+    // AUM (must be positive)
+    if (fund.aumEquity !== undefined) {
+      if (fund.aumEquity <= 0) {
+        outliers.push(`AUM=${fund.aumEquity} (negative?)`);
+      }
+    }
+
+    if (outliers.length > 0) {
+      this.logger.warn(`⚠️ Outliers in '${fund.fundName}': ${outliers.join(', ')}`);
+    }
+  }
+}
 ```
 
 **Explanation**:
-- **Schema validation**: Ensures critical fields exist (fund_name, CAGR, expense ratio)
-- **Outlier detection**: Flags suspicious values without rejecting them
-- **Error logging**: Tracks which funds failed validation
+- **class-validator**: Decorator-based validation (like Pydantic)
+- **Schema validation**: Ensures critical fields exist
+- **Outlier detection**: Flags suspicious values without rejecting
+- **Logger**: Built-in NestJS logger (contextual logging)
 
 ---
 
@@ -793,138 +989,159 @@ class DataLoader:
 
 ## 🧮 Phase 4: Scoring Engine (Weeks 3-4)
 
-### **Step 4.1: Z-Score Calculator**
+### **Step 4.1: Z-Score Calculator Service**
 
-**File**: `src/scoring_engine/z_score_calculator.py`
+**File**: `src/scoring-engine/z-score-calculator.service.ts`
 
-```python
-"""
-Calculate Z-scores for all funds within each category.
-Z-Score = (value - category_mean) / category_stddev
+```typescript
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { mean, standardDeviation } from 'simple-statistics';
+import { MfSchemeDataMonthwise } from '../schemas/mf-scheme-data-monthwise.schema';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
-This normalizes different metrics (CAGR %, Sharpe ratio, expense %)
-so they can be compared apples-to-apples.
-"""
+interface DirectionalityConfig {
+  higherIsBetter: string[];
+  lowerIsBetter: string[];
+}
 
-import json
-from typing import Dict, List
-from datetime import datetime
-import numpy as np
-from src.config.database import get_sync_db
-from loguru import logger
+interface FundZScores {
+  fundId: string;
+  fundName: string;
+  zScores: Record<string, number>;
+  directionalValues: Record<string, number>;
+}
 
-class ZScoreCalculator:
-    """
-    Computes Z-scores per category per month.
-    """
+@Injectable()
+export class ZScoreCalculatorService {
+  private readonly logger = new Logger(ZScoreCalculatorService.name);
+  private directionalityConfig: DirectionalityConfig;
+
+  constructor(
+    @InjectModel(MfSchemeDataMonthwise.name)
+    private mfSchemeDataModel: Model<MfSchemeDataMonthwise>,
+  ) {
+    // Load directionality config
+    const configPath = join(process.cwd(), 'src/config/json/directionality.json');
+    this.directionalityConfig = JSON.parse(readFileSync(configPath, 'utf-8'));
+  }
+
+  /**
+   * Calculate Z-scores for all funds in a category
+   */
+  async calculateForCategory(
+    categoryName: string,
+    timestamp: Date,
+  ): Promise<FundZScores[]> {
+    // Fetch all funds in this category for this month
+    const funds = await this.mfSchemeDataModel.find({
+      timestamp,
+      fundCategory: categoryName,
+    }).lean();
+
+    if (funds.length < 3) {
+      this.logger.warn(`⚠️ Only ${funds.length} funds in '${categoryName}' - skipping Z-scores`);
+      return [];
+    }
+
+    this.logger.log(`📊 Calculating Z-scores for ${funds.length} funds in '${categoryName}'`);
+
+    // Get all parameter names (27 metrics)
+    const paramNames = this.getAllParameters();
     
-    def __init__(self, timestamp: datetime):
-        self.db = get_sync_db()
-        self.timestamp = timestamp
-        self.collection2 = self.db["mf_scheme_data_monthwise"]
-        
-        # Load directionality config
-        with open("src/config/directionality.json", "r") as f:
-            self.directionality = json.load(f)
-    
-    def calculate_for_category(self, category_name: str) -> List[Dict]:
-        """
-        Calculate Z-scores for all funds in a category.
-        
-        Returns:
-            List of dicts with fund_id, z_scores{}, directional_values{}
-        """
-        # Fetch all funds in this category for this month
-        funds = list(self.collection2.find({
-            "timestamp": self.timestamp,
-            "fund_category": category_name
-        }))
-        
-        if len(funds) < 3:
-            logger.warning(f"⚠️ Only {len(funds)} funds in '{category_name}' - skipping Z-scores")
-            return []
-        
-        logger.info(f"📊 Calculating Z-scores for {len(funds)} funds in '{category_name}'")
-        
-        # Get all parameter names (27 metrics)
-        param_names = self._get_all_parameters()
-        
-        # Store results
-        fund_scores = []
-        
-        for param in param_names:
-            # Step 1: Extract values for this parameter across all funds
-            values = []
-            fund_indices = []  # Track which fund each value belongs to
-            
-            for idx, fund in enumerate(funds):
-                val = fund.get(param)
-                if val is not None and not np.isnan(val):
-                    # Apply directionality
-                    directional_val = self._apply_directionality(param, val)
-                    values.append(directional_val)
-                    fund_indices.append(idx)
-            
-            # Step 2: Calculate category statistics
-            if len(values) < 2:
-                continue  # Can't calculate stddev with <2 values
-            
-            category_mean = np.mean(values)
-            category_stddev = np.std(values, ddof=1)  # Sample stddev
-            
-            # Handle zero stddev (all funds have same value)
-            if category_stddev == 0:
-                category_stddev = 1.0  # Avoid division by zero
-            
-            # Step 3: Calculate Z-scores
-            z_scores = [(v - category_mean) / category_stddev for v in values]
-            
-            # Step 4: Assign Z-scores back to funds
-            for fund_idx, z_score in zip(fund_indices, z_scores):
-                if fund_idx >= len(fund_scores):
-                    # Initialize dict for this fund
-                    fund_scores.append({
-                        "fund_id": funds[fund_idx]["fundId"],
-                        "fund_name": funds[fund_idx]["fund_name"],
-                        "z_scores": {},
-                        "directional_values": {}
-                    })
-                
-                fund_scores[fund_idx]["z_scores"][param] = z_score
-                fund_scores[fund_idx]["directional_values"][param] = values[z_scores.index(z_score)]
-        
-        logger.info(f"✅ Z-scores calculated for {len(fund_scores)} funds in '{category_name}'")
-        return fund_scores
-    
-    def _apply_directionality(self, param: str, value: float) -> float:
-        """
-        Invert value if parameter is 'lower is better'.
-        E.g., expense_ratio=0.5 becomes -0.5
-        """
-        if param in self.directionality["lower_is_better"]:
-            return -value
-        return value
-    
-    def _get_all_parameters(self) -> List[str]:
-        """Return list of all 27 parameter names"""
-        return (
-            self.directionality["higher_is_better"] +
-            self.directionality["lower_is_better"]
-        )
+    const fundScores: FundZScores[] = [];
 
-# Usage example:
-# calculator = ZScoreCalculator(timestamp=datetime(2025, 10, 1))
-# large_cap_scores = calculator.calculate_for_category("Large Cap Equity")
+    // Calculate Z-scores for each parameter
+    for (const param of paramNames) {
+      const values: number[] = [];
+      const fundIndices: number[] = [];
+
+      // Extract values for this parameter across all funds
+      funds.forEach((fund, index) => {
+        const val = fund[param];
+        if (val !== null && val !== undefined && !isNaN(val)) {
+          // Apply directionality
+          const directionalVal = this.applyDirectionality(param, val);
+          values.push(directionalVal);
+          fundIndices.push(index);
+        }
+      });
+
+      // Need at least 2 values to calculate stddev
+      if (values.length < 2) continue;
+
+      // Calculate category statistics
+      const categoryMean = mean(values);
+      let categoryStddev = standardDeviation(values);
+
+      // Handle zero stddev (all funds have same value)
+      if (categoryStddev === 0) {
+        this.logger.warn(`⚠️ All funds have same ${param} value in ${categoryName} (stddev=0)`);
+        categoryStddev = 1.0; // Avoid division by zero
+      }
+
+      // Calculate Z-scores
+      const zScores = values.map(v => (v - categoryMean) / categoryStddev);
+
+      // Assign Z-scores back to funds
+      fundIndices.forEach((fundIndex, i) => {
+        if (!fundScores[fundIndex]) {
+          fundScores[fundIndex] = {
+            fundId: funds[fundIndex].fundId.toString(),
+            fundName: funds[fundIndex].fundName,
+            zScores: {},
+            directionalValues: {},
+          };
+        }
+        fundScores[fundIndex].zScores[param] = zScores[i];
+        fundScores[fundIndex].directionalValues[param] = values[i];
+      });
+    }
+
+    this.logger.log(`✅ Z-scores calculated for ${fundScores.length} funds in '${categoryName}'`);
+    return fundScores.filter(f => f !== undefined);
+  }
+
+  /**
+   * Apply directionality (invert lower-is-better metrics)
+   */
+  private applyDirectionality(param: string, value: number): number {
+    if (this.directionalityConfig.lowerIsBetter.includes(param)) {
+      return -value;
+    }
+    return value;
+  }
+
+  /**
+   * Get all 27 parameter names
+   */
+  private getAllParameters(): string[] {
+    return [
+      ...this.directionalityConfig.higherIsBetter,
+      ...this.directionalityConfig.lowerIsBetter,
+    ];
+  }
+}
 ```
 
 **Explanation**:
 - **Directionality first**: Invert "lower is better" metrics before calculating mean/stddev
-- **Handle missing values**: Skip nulls (not all funds have all metrics)
-- **Sample stddev**: Use `ddof=1` for unbiased estimator
+- **Handle missing values**: Skip nulls/undefined (not all funds have all metrics)
+- **Sample stddev**: `simple-statistics` library handles this correctly
+- **Edge case handling**: stddev=0 → set to 1.0 to avoid division by zero
 
 ---
 
-*(Continue with Step 4.2 Group Scorer, 4.3 Composite Scorer, 4.4 Ranker...)*
+**Note**: Phases 5-8 (Portfolio Construction, BSE Integration, Rebalancing, REST API) will follow the same NestJS patterns:
+- Services with dependency injection
+- DTOs for validation
+- Mongoose models for data persistence
+- Logger for observability
+- Type safety throughout
+
+The core algorithm logic remains the same; only the syntax/framework changes from Python to TypeScript/NestJS.
 
 ---
 

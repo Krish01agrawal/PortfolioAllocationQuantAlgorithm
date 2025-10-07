@@ -1,10 +1,10 @@
-# Database Schema Context
+# Database Schema Context (Mongoose/NestJS)
 
 ## Architecture Philosophy
 
 **Time-Series with References Design**
 
-We use 4 collections in 2 pairs:
+We use 4 Mongoose schemas in 2 pairs:
 1. **Raw Data Pair**: Collection 1 (master registry) ↔ Collection 2 (time-series snapshots)
 2. **Computed Data Pair**: Collection 3 (category registry) ↔ Collection 4 (time-series scores)
 
@@ -13,9 +13,10 @@ We use 4 collections in 2 pairs:
 ### Benefits:
 ✅ **No Data Duplication**: Fund metadata stored once in Collection 1  
 ✅ **Historical Tracking**: All past months preserved for trend analysis  
-✅ **Fast Queries**: ObjectId references enable efficient joins  
+✅ **Fast Queries**: ObjectId references + indexes enable efficient joins  
 ✅ **Separation of Concerns**: Raw vs computed data isolated  
 ✅ **Scalability**: Can handle 10+ years of monthly snapshots  
+✅ **Type Safety**: Mongoose schemas + TypeScript interfaces provide compile-time checks
 
 ### vs Embedded Design:
 ❌ Embedding all monthly data in one document → bloated documents (>16MB limit)  
@@ -274,43 +275,57 @@ Monthly Scoring:
 6. Update Collection 3.mf_scores_plan_list (reference)
 ```
 
-## Code Patterns
+## Code Patterns (Mongoose/TypeScript)
 
 ### When querying latest data:
-```python
-# ALWAYS use timestamp + category together
-latest_data = db.mf_scheme_data_monthwise.find({
-    "timestamp": latest_timestamp,
-    "fund_category": category_name
-})
+```typescript
+// ALWAYS use timestamp + category together + lean() for performance
+const latestData = await this.mfSchemeDataModel.find({
+  timestamp: latestTimestamp,
+  fundCategory: categoryName
+}).lean();
 ```
 
 ### When inserting new snapshots:
-```python
-# ALWAYS update reference in master collection
-snapshot_id = db.mf_scheme_data_monthwise.insert_one(data).inserted_id
+```typescript
+// ALWAYS update reference in master collection
+const snapshot = new this.mfSchemeDataModel(data);
+const savedSnapshot = await snapshot.save();
 
-db.mf_scheme_track_record.update_one(
-    {"_id": fund_id},
-    {"$push": {"schemeMonthTrackList": {
-        "timestamp": timestamp,
-        "mfDataId": snapshot_id
-    }}}
-)
+await this.mfSchemeTrackRecordModel.updateOne(
+  { _id: fundId },
+  {
+    $push: {
+      schemeMonthTrackList: {
+        timestamp,
+        mfDataId: savedSnapshot._id,
+      },
+    },
+  },
+);
 ```
 
 ### When joining collections:
-```python
-# Use aggregation pipeline
-pipeline = [
-    {"$match": {"category_name": "Large Cap Equity"}},
-    {"$lookup": {
-        "from": "mf_scheme_track_record",
-        "localField": "mf_dec_scores.fund_id",
-        "foreignField": "_id",
-        "as": "fund_details"
-    }}
-]
+```typescript
+// Use aggregation pipeline or populate()
+const pipeline = [
+  { $match: { categoryName: 'Large Cap Equity' } },
+  {
+    $lookup: {
+      from: 'mfSchemeTrackRecord',
+      localField: 'mfDecScores.fundId',
+      foreignField: '_id',
+      as: 'fundDetails',
+    },
+  },
+];
+
+const results = await this.mfScoresModel.aggregate(pipeline);
+
+// Or use populate for simple joins
+const scores = await this.mfScoresModel
+  .findOne({ categoryName: 'Large Cap Equity' })
+  .populate('mfDecScores.fundId');
 ```
 
 ## Migration Strategy
@@ -326,10 +341,11 @@ If schema changes:
 - **Retention**: 30 days rolling
 - **Critical collections**: Collection 1 & 2 (raw data) - rest can be recomputed
 
-## Related Files
+## Related Files (NestJS/Mongoose)
 
-- `src/models/mf_scheme_track_record.py`
-- `src/models/mf_scheme_data_monthwise.py`
-- `src/models/category_score.py`
-- `src/models/mf_scores.py`
-- `src/config/database.py`
+- `src/schemas/mf-scheme-track-record.schema.ts`
+- `src/schemas/mf-scheme-data-monthwise.schema.ts`
+- `src/schemas/category-score.schema.ts`
+- `src/schemas/mf-scores.schema.ts`
+- `src/config/database.config.ts`
+- `src/config/config.module.ts`
