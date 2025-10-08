@@ -5,6 +5,8 @@ import { MfSchemeDataMonthwise, MfSchemeDataMonthwiseSchema } from './schemas/mf
 import { MfSchemeTrackRecordDao } from './dao/mf-scheme-track-record.dao';
 import { MfSchemeDataMonthwiseDao } from './dao/mf-scheme-data-monthwise.dao';
 import { MutualFundService } from './services/mutual-fund.service';
+import { MutualFundController } from './controllers/mutual-fund.controller';
+import { MorningstarModule } from '../morningstar/morningstar.module';
 
 /**
  * Mutual Fund Module
@@ -13,11 +15,13 @@ import { MutualFundService } from './services/mutual-fund.service';
  * - Master fund registry
  * - Monthly snapshots
  * - Data ingestion
+ * - REST API endpoints
  * 
  * Structure:
  * - Schemas: MongoDB collections
  * - DAOs: Database access layer (Repository pattern)
  * - Services: Business logic
+ * - Controllers: REST API endpoints
  */
 @Module({
   imports: [
@@ -31,7 +35,9 @@ import { MutualFundService } from './services/mutual-fund.service';
         schema: MfSchemeDataMonthwiseSchema,
       },
     ]),
+    MorningstarModule, // Import for MorningstarParserService
   ],
+  controllers: [MutualFundController],
   providers: [
     MfSchemeTrackRecordDao,
     MfSchemeDataMonthwiseDao,

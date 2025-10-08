@@ -35,6 +35,13 @@ export class MfSchemeTrackRecordDao {
   }
 
   /**
+   * Find all funds with optional filter
+   */
+  async findAll(filter: any = {}): Promise<MfSchemeTrackRecord[]> {
+    return this.model.find(filter).exec();
+  }
+
+  /**
    * Find all active funds
    */
   async findAllActive(): Promise<MfSchemeTrackRecord[]> {
@@ -46,6 +53,13 @@ export class MfSchemeTrackRecordDao {
    */
   async findByCategory(category: string): Promise<MfSchemeTrackRecord[]> {
     return this.model.find({ Category: category }).exec();
+  }
+
+  /**
+   * Find by Fund_ID (Morningstar ID)
+   */
+  async findByFundID(fundId: string): Promise<MfSchemeTrackRecord | null> {
+    return this.model.findOne({ Fund_ID: fundId }).exec();
   }
 
   /**

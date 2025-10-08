@@ -1,0 +1,56 @@
+{
+  "funds": [
+    {
+      "Fund_ID": "TEST001",
+      "Fund_Name": "Test Large Cap Fund",
+      "Category": "Large Cap",
+      "NAV": 100.5,
+      "AUM_Cr": 50000,
+      "5Y_CAGR": 19.25,
+      "3Y_Rolling": 88,
+      "Sharpe_3Y": 1.35,
+      "Sortino_3Y": 1.62,
+      "Alpha": 2.1,
+      "Beta": 0.92,
+      "Std_Dev": 12.5,
+      "Max_DD": -13.5,
+      "Recovery_Mo": 8,
+      "Downside_Capture": 62,
+      "Expense": 0.58,
+      "Turnover": 30,
+      "Concentration": 35,
+      "Fund_House": "Tier 1",
+      "Manager_Tenure": 10,
+      "Manager_Record": "Excellent",
+      "AMC_Risk": "Excellent",
+      "ESG": "Strong"
+    },
+    {
+      "Fund_ID": "TEST002",
+      "Fund_Name": "Test Mid Cap Fund",
+      "Category": "Mid Cap",
+      "NAV": 78.9,
+      "AUM_Cr": 28000,
+      "5Y_CAGR": 24.15,
+      "3Y_Rolling": 82,
+      "Sharpe_3Y": 1.28,
+      "Sortino_3Y": 1.55,
+      "Alpha": 3.2,
+      "Beta": 1.05,
+      "Std_Dev": 15.8,
+      "Max_DD": -18.2,
+      "Recovery_Mo": 11,
+      "Downside_Capture": 75,
+      "Expense": 0.72,
+      "Turnover": 42,
+      "Concentration": 45,
+      "Fund_House": "Tier 2",
+      "Manager_Tenure": 6,
+      "Manager_Record": "Good",
+      "AMC_Risk": "Good",
+      "ESG": "Moderate"
+    }
+  ],
+  "timestamp": "2025-11-01"
+}
+

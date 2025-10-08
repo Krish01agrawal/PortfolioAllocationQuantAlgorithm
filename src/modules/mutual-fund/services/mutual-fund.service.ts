@@ -120,10 +120,30 @@ export class MutualFundService {
   }
 
   /**
-   * Get fund history
+   * Get all funds with optional filters
+   */
+  async getAllFunds(filter: any = {}) {
+    return this.trackRecordDao.findAll(filter);
+  }
+
+  /**
+   * Get fund by Fund_ID
+   */
+  async getFundById(fundId: string) {
+    return this.trackRecordDao.findByFundID(fundId);
+  }
+
+  /**
+   * Get fund history (monthly snapshots)
    */
   async getFundHistory(fundId: string, fromDate?: Date, toDate?: Date) {
-    return this.monthwiseDao.findFundHistory(fundId, fromDate, toDate);
+    // First, get the fund master to get the internal _id
+    const fund = await this.trackRecordDao.findByFundID(fundId);
+    if (!fund) {
+      return [];
+    }
+
+    return this.monthwiseDao.findFundHistory(fund._id.toString(), fromDate, toDate);
   }
 
   /**
