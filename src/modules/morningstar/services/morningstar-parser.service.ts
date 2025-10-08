@@ -2,26 +2,33 @@ import { Injectable, Logger } from '@nestjs/common';
 import { readFileSync } from 'fs';
 import { validate } from 'class-validator';
 import { plainToClass } from 'class-transformer';
-import { FundDataDto } from '../../mutual-fund/dtos/fund-data.dto';
+import { MorningstarRawDto } from '../dtos/morningstar-raw.dto';
 import { normalizeFundCategory } from '../../../utils/category-mapper.util';
 
 /**
  * Morningstar Parser Service
  * 
  * Purpose: Parse and validate Morningstar JSON data
- * SOLID: Single Responsibility - Only handles parsing/validation
+ * Philosophy: STORE AS-IS, Morningstar format is SOURCE OF TRUTH
+ * 
+ * Responsibilities:
+ * 1. Validate required fields
+ * 2. Normalize categories (for our enum)
+ * 3. Handle empty strings → null
+ * 4. Return validated Morningstar format AS-IS
  */
 @Injectable()
 export class MorningstarParserService {
   private readonly logger = new Logger(MorningstarParserService.name);
 
-  private readonly REQUIRED_FIELDS = ['fund_name', 'fund_category'];
-  private readonly CRITICAL_FIELDS = ['sharpe_ratio', 'expense_ratio_equity', 'expense_ratio_debt'];
+  // Required fields in Morningstar format (PascalCase_Underscore)
+  private readonly REQUIRED_FIELDS = ['Fund_ID', 'Fund_Name', 'Category'];
+  private readonly CRITICAL_FIELDS = ['Sharpe_3Y', 'Expense', 'AUM_Cr'];
 
   /**
    * Parse data from file
    */
-  async parseFile(filePath: string): Promise<FundDataDto[]> {
+  async parseFile(filePath: string): Promise<MorningstarRawDto[]> {
     this.logger.log(`📂 Reading file: ${filePath}`);
 
     try {
@@ -36,7 +43,7 @@ export class MorningstarParserService {
   /**
    * Parse data from string
    */
-  async parseString(data: string): Promise<FundDataDto[]> {
+  async parseString(data: string): Promise<MorningstarRawDto[]> {
     try {
       const rawData = JSON.parse(data);
 
@@ -46,7 +53,7 @@ export class MorningstarParserService {
 
       this.logger.log(`📊 Parsing ${rawData.length} funds...`);
 
-      const validatedFunds: FundDataDto[] = [];
+      const validatedFunds: MorningstarRawDto[] = [];
       const errors: string[] = [];
 
       for (let i = 0; i < rawData.length; i++) {
@@ -79,19 +86,22 @@ export class MorningstarParserService {
 
   /**
    * Validate single fund
+   * Returns Morningstar format AS-IS (source of truth)
    */
-  async validateFund(fundData: any): Promise<FundDataDto | null> {
+  async validateFund(fundData: any): Promise<MorningstarRawDto | null> {
+    // Step 1: Check required fields
     if (!this.hasRequiredFields(fundData)) {
       return null;
     }
 
-    // Normalize category name before validation
-    if (fundData.fund_category) {
-      fundData.fund_category = normalizeFundCategory(fundData.fund_category);
+    // Step 2: Normalize category (for our enum validation)
+    if (fundData.Category) {
+      fundData.Category = normalizeFundCategory(fundData.Category);
     }
 
-    const fundDto = plainToClass(FundDataDto, fundData);
-
+    // Step 3: Validate Morningstar format
+    const fundDto = plainToClass(MorningstarRawDto, fundData);
+    
     const validationErrors = await validate(fundDto, {
       whitelist: true,
       forbidNonWhitelisted: false,
@@ -102,13 +112,15 @@ export class MorningstarParserService {
         .map((err) => Object.values(err.constraints || {}).join(', '))
         .join('; ');
 
-      this.logger.warn(`⚠️ Validation errors for ${fundDto.fund_name}: ${errorMessages}`);
+      this.logger.warn(`⚠️ Validation errors for ${fundData.Fund_Name}: ${errorMessages}`);
       return null;
     }
 
+    // Step 4: Additional checks (warnings only)
     this.checkCriticalFields(fundDto);
     this.detectOutliers(fundDto);
 
+    // Return AS-IS (no transformation)
     return fundDto;
   }
 
@@ -125,36 +137,35 @@ export class MorningstarParserService {
     return true;
   }
 
-  private checkCriticalFields(fundDto: FundDataDto): void {
+  private checkCriticalFields(fundDto: MorningstarRawDto): void {
     const missingCritical = this.CRITICAL_FIELDS.filter(
       (field) => !(field in fundDto) || fundDto[field] === null,
     );
 
     if (missingCritical.length > 0) {
       this.logger.warn(
-        `⚠️ Missing critical fields for ${fundDto.fund_name}: ${missingCritical.join(', ')}`,
+        `⚠️ Missing critical fields for ${fundDto.Fund_Name}: ${missingCritical.join(', ')}`,
       );
     }
   }
 
-  private detectOutliers(fundDto: FundDataDto): void {
+  private detectOutliers(fundDto: MorningstarRawDto): void {
     const outliers: string[] = [];
 
-    if (fundDto.five_year_cagr_equity !== undefined) {
-      if (fundDto.five_year_cagr_equity < -50 || fundDto.five_year_cagr_equity > 100) {
-        outliers.push(`CAGR=${fundDto.five_year_cagr_equity}%`);
+    if (fundDto['5Y_CAGR'] !== undefined && fundDto['5Y_CAGR'] !== null) {
+      if (fundDto['5Y_CAGR'] < -50 || fundDto['5Y_CAGR'] > 100) {
+        outliers.push(`5Y_CAGR=${fundDto['5Y_CAGR']}%`);
       }
     }
 
-    if (fundDto.expense_ratio_equity !== undefined) {
-      if (fundDto.expense_ratio_equity < 0.1 || fundDto.expense_ratio_equity > 3) {
-        outliers.push(`Expense=${fundDto.expense_ratio_equity}%`);
+    if (fundDto.Expense !== undefined && fundDto.Expense !== null) {
+      if (fundDto.Expense < 0.1 || fundDto.Expense > 3) {
+        outliers.push(`Expense=${fundDto.Expense}%`);
       }
     }
 
     if (outliers.length > 0) {
-      this.logger.warn(`⚠️ Outliers in ${fundDto.fund_name}: ${outliers.join(', ')}`);
+      this.logger.warn(`⚠️ Outliers in ${fundDto.Fund_Name}: ${outliers.join(', ')}`);
     }
   }
 }
-

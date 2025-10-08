@@ -20,6 +20,8 @@ export const SchemeMonthTrackSchema = SchemaFactory.createForClass(SchemeMonthTr
  * 
  * Purpose: Master registry of all mutual funds
  * Design Pattern: Registry Pattern + Reference Pattern
+ * 
+ * IMPORTANT: Uses Morningstar field names (PascalCase_Underscore)
  */
 @Schema({ 
   collection: 'mfSchemeTrackRecord',
@@ -27,25 +29,13 @@ export const SchemeMonthTrackSchema = SchemaFactory.createForClass(SchemeMonthTr
 })
 export class MfSchemeTrackRecord extends Document {
   @Prop({ required: true, index: true, unique: true, trim: true })
-  fund_name: string;
+  Fund_ID: string;
 
-  @Prop({ index: true, trim: true })
-  amc?: string;
+  @Prop({ required: true, trim: true })
+  Fund_Name: string;
 
-  @Prop({ unique: true, sparse: true, trim: true })
-  schemeCode?: string;
-
-  @Prop({ trim: true })
-  isin?: string;
-
-  @Prop({ default: 'Regular', enum: ['Regular', 'Direct'] })
-  plan: string;
-
-  @Prop({ default: 'Growth', enum: ['Growth', 'IDCW'] })
-  option: string;
-
-  @Prop({ type: Date })
-  inceptionDate?: Date;
+  @Prop({ required: true, index: true })
+  Category: string;
 
   @Prop({ default: 'Active', enum: ['Active', 'Closed', 'Merged', 'Suspended'], index: true })
   status: string;
@@ -56,9 +46,9 @@ export class MfSchemeTrackRecord extends Document {
 
 export const MfSchemeTrackRecordSchema = SchemaFactory.createForClass(MfSchemeTrackRecord);
 
-// Indexes
-MfSchemeTrackRecordSchema.index({ fund_name: 1 });
-MfSchemeTrackRecordSchema.index({ schemeCode: 1 }, { unique: true, sparse: true });
+// Indexes (using Morningstar field names)
+MfSchemeTrackRecordSchema.index({ Fund_ID: 1 }, { unique: true });
+MfSchemeTrackRecordSchema.index({ Fund_Name: 1 });
+MfSchemeTrackRecordSchema.index({ Category: 1 });
 MfSchemeTrackRecordSchema.index({ status: 1 });
-MfSchemeTrackRecordSchema.index({ amc: 1 });
 

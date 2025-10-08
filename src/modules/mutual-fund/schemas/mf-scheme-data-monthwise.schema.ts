@@ -6,7 +6,9 @@ import { Document, Types } from 'mongoose';
  * 
  * Purpose: Time-series storage of monthly fund parameters
  * Design Pattern: Time-Series Pattern
- * Schema: Matches EXACT Morningstar API format (snake_case)
+ * 
+ * IMPORTANT: Stores Morningstar data AS-IS (PascalCase_Underscore)
+ * This is the SOURCE OF TRUTH - no transformation!
  */
 @Schema({ 
   collection: 'mfSchemeDataMonthwise',
@@ -20,121 +22,86 @@ export class MfSchemeDataMonthwise extends Document {
   fundId: Types.ObjectId;
 
   // ==========================================
-  // REQUIRED FIELDS (Matching Morningstar)
+  // MORNINGSTAR FIELDS (AS-IS, SOURCE OF TRUTH)
   // ==========================================
   
   @Prop({ required: true, trim: true })
-  fund_name: string;
+  Fund_ID: string;
+
+  @Prop({ required: true, trim: true })
+  Fund_Name: string;
 
   @Prop({ required: true, index: true })
-  fund_category: string;
+  Category: string;
 
-  // ==========================================
-  // QUANTITATIVE PARAMETERS (17)
-  // ==========================================
-  
+  // Basic metrics
   @Prop({ type: Number })
-  five_year_cagr_equity?: number;
+  NAV?: number;
 
   @Prop({ type: Number })
-  five_year_cagr_debt_hybrid?: number;
+  AUM_Cr?: number;
 
-  @Prop({ type: Number, min: 0, max: 100 })
-  three_year_rolling_consistency?: number;
+  // Performance metrics
+  @Prop({ type: Number })
+  '5Y_CAGR'?: number;
 
   @Prop({ type: Number })
-  sharpe_ratio?: number;
+  '3Y_Rolling'?: number;
 
   @Prop({ type: Number })
-  sortino_ratio?: number;
+  Sharpe_3Y?: number;
 
   @Prop({ type: Number })
-  alpha?: number;
+  Sortino_3Y?: number;
 
   @Prop({ type: Number })
-  beta?: number;
+  Alpha?: number;
 
   @Prop({ type: Number })
-  std_dev_equity?: number;
+  Beta?: number;
 
   @Prop({ type: Number })
-  std_dev_debt_hybrid?: number;
+  Std_Dev?: number;
 
   @Prop({ type: Number })
-  max_drawdown?: number;
+  Max_DD?: number;
 
   @Prop({ type: Number })
-  recovery_period?: number;
+  Recovery_Mo?: number;
 
   @Prop({ type: Number })
-  downside_capture_ratio?: number;
+  Downside_Capture?: number;
 
   @Prop({ type: Number })
-  expense_ratio_equity?: number;
+  Expense?: number;
 
   @Prop({ type: Number })
-  expense_ratio_debt?: number;
+  Turnover?: number;
 
   @Prop({ type: Number })
-  aum_equity?: number;
+  Concentration?: number;
+
+  // Qualitative fields (TEXT - store AS-IS from Morningstar)
+  @Prop({ type: String })
+  Fund_House?: string;
 
   @Prop({ type: Number })
-  aum_debt?: number;
+  Manager_Tenure?: number;
 
-  @Prop({ type: Number, min: 1, max: 5 })
-  liquidity_risk?: number;
+  @Prop({ type: String })
+  Manager_Record?: string;
 
-  @Prop({ type: Number })
-  portfolio_turnover_ratio?: number;
+  @Prop({ type: String })
+  AMC_Risk?: string;
 
-  @Prop({ type: Number, min: 1, max: 5 })
-  concentration_sector_fit?: number;
-
-  @Prop({ type: Number, min: 1, max: 5 })
-  style_fit?: number;
-
-  // ==========================================
-  // QUALITATIVE PARAMETERS (5)
-  // ==========================================
-  
-  @Prop({ type: Number, min: 1, max: 5 })
-  fund_house_reputation?: number;
-
-  @Prop({ type: Number })
-  fund_manager_tenure?: number;
-
-  @Prop({ type: Number, min: 1, max: 5 })
-  fund_manager_track_record?: number;
-
-  @Prop({ type: Number, min: 1, max: 5 })
-  amc_risk_management?: number;
-
-  @Prop({ type: Number, min: 1, max: 5 })
-  esg_governance?: number;
-
-  // ==========================================
-  // FORWARD-LOOKING PARAMETERS (5)
-  // ==========================================
-  
-  @Prop({ type: Number, min: 1, max: 5 })
-  benchmark_consistency?: number;
-
-  @Prop({ type: Number, min: 1, max: 5 })
-  peer_comparison?: number;
-
-  @Prop({ type: Number, min: 1, max: 5 })
-  tax_efficiency?: number;
-
-  @Prop({ type: Number, min: 1, max: 5 })
-  fund_innovation?: number;
-
-  @Prop({ type: Number, min: 1, max: 5 })
-  forward_risk_mitigation?: number;
+  @Prop({ type: String })
+  ESG?: string;
 }
 
 export const MfSchemeDataMonthwiseSchema = SchemaFactory.createForClass(MfSchemeDataMonthwise);
 
-// Compound index for efficient queries
+// Compound index for efficient queries (using Morningstar field names)
 MfSchemeDataMonthwiseSchema.index({ fundId: 1, timestamp: -1 });
-MfSchemeDataMonthwiseSchema.index({ fund_category: 1, timestamp: -1 });
+MfSchemeDataMonthwiseSchema.index({ Category: 1, timestamp: -1 });
+MfSchemeDataMonthwiseSchema.index({ Fund_ID: 1, timestamp: -1 });
 MfSchemeDataMonthwiseSchema.index({ timestamp: -1 });

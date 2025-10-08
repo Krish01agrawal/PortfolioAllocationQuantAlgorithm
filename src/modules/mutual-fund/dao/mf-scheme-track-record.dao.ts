@@ -8,6 +8,8 @@ import { MfSchemeTrackRecord } from '../schemas/mf-scheme-track-record.schema';
  * 
  * Purpose: Repository pattern for Collection 1
  * SOLID: Single Responsibility - Only handles DB operations for Collection 1
+ * 
+ * IMPORTANT: Works with Morningstar format (PascalCase_Underscore)
  */
 @Injectable()
 export class MfSchemeTrackRecordDao {
@@ -19,14 +21,14 @@ export class MfSchemeTrackRecordDao {
   ) {}
 
   /**
-   * Find fund by name
+   * Find fund by Fund_ID (Morningstar format)
    */
-  async findByFundName(fundName: string): Promise<MfSchemeTrackRecord | null> {
-    return this.model.findOne({ fund_name: fundName }).exec();
+  async findByFundId(fundId: string): Promise<MfSchemeTrackRecord | null> {
+    return this.model.findOne({ Fund_ID: fundId }).exec();
   }
 
   /**
-   * Find fund by ID
+   * Find fund by internal ObjectId
    */
   async findById(id: string): Promise<MfSchemeTrackRecord | null> {
     return this.model.findById(id).exec();
@@ -40,21 +42,21 @@ export class MfSchemeTrackRecordDao {
   }
 
   /**
-   * Find by AMC
+   * Find by category
    */
-  async findByAmc(amc: string): Promise<MfSchemeTrackRecord[]> {
-    return this.model.find({ amc }).exec();
+  async findByCategory(category: string): Promise<MfSchemeTrackRecord[]> {
+    return this.model.find({ Category: category }).exec();
   }
 
   /**
-   * Upsert fund master
+   * Upsert fund master (using Morningstar Fund_ID)
    */
   async upsert(
-    fundName: string,
+    fundId: string,
     data: Partial<MfSchemeTrackRecord>,
   ): Promise<MfSchemeTrackRecord> {
     return this.model.findOneAndUpdate(
-      { fund_name: fundName },
+      { Fund_ID: fundId },
       { $set: data },
       { upsert: true, new: true, setDefaultsOnInsert: true },
     );
@@ -109,4 +111,3 @@ export class MfSchemeTrackRecordDao {
     return this.model.countDocuments(filter).exec();
   }
 }
-

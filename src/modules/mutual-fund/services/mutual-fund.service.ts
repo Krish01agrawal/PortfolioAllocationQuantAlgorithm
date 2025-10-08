@@ -1,11 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MfSchemeTrackRecordDao } from '../dao/mf-scheme-track-record.dao';
 import { MfSchemeDataMonthwiseDao } from '../dao/mf-scheme-data-monthwise.dao';
-import { FundDataDto } from '../dtos/fund-data.dto';
+import { MorningstarRawDto } from '../../morningstar/dtos/morningstar-raw.dto';
 
-/**
- * Ingestion Result Interface
- */
 export interface IngestionResult {
   success: boolean;
   fundsProcessed: number;
@@ -19,11 +16,9 @@ export interface IngestionResult {
  * Mutual Fund Service
  * 
  * Purpose: Business logic for mutual fund operations
- * - Uses DAOs for database access
- * - Handles ingestion workflow
- * - Maintains referential integrity
+ * SOLID: Single Responsibility - Orchestrates fund data ingestion
  * 
- * SOLID: Single Responsibility - Only handles mutual fund business logic
+ * IMPORTANT: Works with Morningstar format AS-IS (source of truth)
  */
 @Injectable()
 export class MutualFundService {
@@ -35,24 +30,21 @@ export class MutualFundService {
   ) {}
 
   /**
-   * Ingest monthly fund data
+   * Ingest monthly fund data (Morningstar format AS-IS)
    * 
-   * Workflow:
-   * 1. Normalize timestamp
-   * 2. For each fund:
-   *    a. Upsert master record
-   *    b. Insert/update snapshot
-   *    c. Update reference list
+   * Process:
+   * 1. Upsert master record (Collection 1)
+   * 2. Check if snapshot exists for this month
+   * 3. Insert or update snapshot (Collection 2)
+   * 4. Update reference list in master record
    */
   async ingestMonthlyData(
-    fundData: FundDataDto[],
+    fundData: MorningstarRawDto[],
     timestamp: Date,
   ): Promise<IngestionResult> {
-    this.logger.log(
-      `🚀 Starting ingestion of ${fundData.length} funds for ${timestamp.toISOString()}`,
-    );
-
     const normalizedTimestamp = this.normalizeTimestamp(timestamp);
+
+    this.logger.log(`🚀 Starting ingestion of ${fundData.length} funds for ${normalizedTimestamp.toISOString()}`);
 
     const result: IngestionResult = {
       success: false,
@@ -65,12 +57,11 @@ export class MutualFundService {
 
     for (const fund of fundData) {
       try {
-        // Step 1: Upsert master record
-        const fundMaster = await this.trackRecordDao.upsert(fund.fund_name, {
-          fund_name: fund.fund_name,
-          amc: fund.amc,
-          scheme_code: fund.scheme_code,
-          isin: fund.isin,
+        // Step 1: Upsert master record (using Morningstar Fund_ID)
+        const fundMaster = await this.trackRecordDao.upsert(fund.Fund_ID, {
+          Fund_ID: fund.Fund_ID,
+          Fund_Name: fund.Fund_Name,
+          Category: fund.Category,
         } as any);
 
         const fundId = fundMaster._id.toString();
@@ -85,16 +76,16 @@ export class MutualFundService {
           // Update existing
           await this.monthwiseDao.update(existingSnapshot._id.toString(), fund);
           result.fundsUpdated++;
-          this.logger.debug(`✏️ Updated snapshot for ${fund.fund_name}`);
+          this.logger.debug(`✏️ Updated snapshot for ${fund.Fund_Name}`);
         } else {
-          // Insert new
+          // Insert new (store Morningstar data AS-IS)
           const snapshot = await this.monthwiseDao.create(
             fundId,
             normalizedTimestamp,
             fund,
           );
           result.fundsAdded++;
-          this.logger.debug(`➕ Added snapshot for ${fund.fund_name}`);
+          this.logger.debug(`➕ Added snapshot for ${fund.Fund_Name}`);
 
           // Step 3: Update reference list
           await this.trackRecordDao.addMonthlyReference(
@@ -106,7 +97,7 @@ export class MutualFundService {
 
         result.fundsProcessed++;
       } catch (error) {
-        const errorMsg = `${fund.fund_name}: ${error.message}`;
+        const errorMsg = `${fund.Fund_Name}: ${error.message}`;
         result.errors.push(errorMsg);
         this.logger.error(`❌ ${errorMsg}`);
       }
@@ -152,4 +143,3 @@ export class MutualFundService {
     return normalized;
   }
 }
-

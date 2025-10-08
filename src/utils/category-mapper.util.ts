@@ -77,6 +77,7 @@ const CATEGORY_ALIASES: CategoryMapping = {
   // Debt Corporate variations
   'Debt – Corporate': FundCategory.DEBT_CORPORATE,
   'Debt - Corporate': FundCategory.DEBT_CORPORATE,
+  'Debt-Corp': FundCategory.DEBT_CORPORATE, // ← ACTUAL Morningstar format
   'Corporate Bond': FundCategory.DEBT_CORPORATE,
   'Corporate Debt': FundCategory.DEBT_CORPORATE,
   'Debt: Corporate': FundCategory.DEBT_CORPORATE,
@@ -84,6 +85,7 @@ const CATEGORY_ALIASES: CategoryMapping = {
   // Debt Short/Ultra Short variations
   'Debt – Short/Ultra Short': FundCategory.DEBT_SHORT,
   'Debt - Short/Ultra Short': FundCategory.DEBT_SHORT,
+  'Debt-Short': FundCategory.DEBT_SHORT, // ← ACTUAL Morningstar format
   'Short Duration': FundCategory.DEBT_SHORT,
   'Ultra Short Duration': FundCategory.DEBT_SHORT,
   'Liquid': FundCategory.DEBT_SHORT,
@@ -93,6 +95,7 @@ const CATEGORY_ALIASES: CategoryMapping = {
   // Debt Banking/PSU variations
   'Debt – Banking / PSU': FundCategory.DEBT_BANKING_PSU,
   'Debt - Banking / PSU': FundCategory.DEBT_BANKING_PSU,
+  'Debt-Banking': FundCategory.DEBT_BANKING_PSU, // ← ACTUAL Morningstar format
   'Banking & PSU': FundCategory.DEBT_BANKING_PSU,
   'Banking and PSU': FundCategory.DEBT_BANKING_PSU,
   'PSU': FundCategory.DEBT_BANKING_PSU,
@@ -101,6 +104,7 @@ const CATEGORY_ALIASES: CategoryMapping = {
   // Debt Gilt variations
   'Debt – Gilt': FundCategory.DEBT_GILT,
   'Debt - Gilt': FundCategory.DEBT_GILT,
+  'Debt-Gilt': FundCategory.DEBT_GILT, // ← ACTUAL Morningstar format
   'Gilt': FundCategory.DEBT_GILT,
   'Government Securities': FundCategory.DEBT_GILT,
   'G-Sec': FundCategory.DEBT_GILT,
