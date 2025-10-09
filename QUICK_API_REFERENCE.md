@@ -1,5 +1,9 @@
 # 🚀 Quick API Reference
 
+# Test data ingestion (WORKING ✅)
+npm run test:ingestion
+
+
 ## Server
 ```bash
 # Start server

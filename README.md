@@ -18,6 +18,19 @@ PlutoMoney Quant is a sophisticated portfolio allocation algorithm that:
 
 ---
 
+## **✅ Current Status**
+
+**Phase 1: Data Ingestion** - ✅ **COMPLETE**
+- REST API with 4 endpoints
+- MongoDB Collections 1 & 2 operational
+- Morningstar data ingestion (AS-IS format)
+- Monthly cron scheduler configured
+- 8 funds, 13 snapshots ingested
+
+**Next: Phase 2 - Scoring Engine** (Collections 3 & 4, Z-scores, Risk weighting)
+
+---
+
 ## **⚡ Quick Start**
 
 ```bash
@@ -32,15 +45,21 @@ cp sample.env .env
 brew services start mongodb-community                    # macOS
 docker run -d -p 27017:27017 --name mongodb mongo:latest # Docker
 
-# 4. Test Collections 1 & 2
+# 4. Start the API server
+npm run start:dev
+# Server runs on: http://localhost:3000
+
+# 5. Test via REST API
+curl http://localhost:3000/api/mutual-funds | python3 -m json.tool
+
+# 6. Or test via script
 npm run test:ingestion
 
-# 5. Verify in MongoDB
-mongosh
-use plutomoney_quant
-db.mfSchemeTrackRecord.find().pretty()
-db.mfSchemeDataMonthwise.find().pretty()
+# 7. Verify in MongoDB
+mongosh plutomoney_quant --eval "db.mfSchemeTrackRecord.find().pretty()"
 ```
+
+**See `QUICK_API_REFERENCE.md` for complete API documentation**
 
 ---
 
@@ -399,12 +418,76 @@ MONGODB_URI=mongodb://localhost:27017/plutomoney_quant
 
 ---
 
-## **📖 Additional Documentation**
+## **📡 REST API Endpoints**
 
+### **POST /api/mutual-funds/ingest** - Manual Data Ingestion
+Ingest fund data directly (perfect for testing before Morningstar is configured)
+
+```bash
+curl -X POST http://localhost:3000/api/mutual-funds/ingest \
+  -H "Content-Type: application/json" \
+  -d @test-api-payload.json | python3 -m json.tool
+```
+
+### **GET /api/mutual-funds** - Get All Funds
+```bash
+# All funds
+curl http://localhost:3000/api/mutual-funds | python3 -m json.tool
+
+# Filter by category
+curl "http://localhost:3000/api/mutual-funds?category=Large%20Cap%20Equity" | python3 -m json.tool
+```
+
+### **GET /api/mutual-funds/:id** - Get Specific Fund
+```bash
+curl http://localhost:3000/api/mutual-funds/LC001 | python3 -m json.tool
+```
+
+### **GET /api/mutual-funds/:id/history** - Get Fund History
+```bash
+curl http://localhost:3000/api/mutual-funds/LC001/history | python3 -m json.tool
+```
+
+**Complete API documentation:** `QUICK_API_REFERENCE.md`
+
+---
+
+## **📖 Documentation**
+
+### **Getting Started**
+- **`README.md`** (this file) - Overview & Quick Start
+- **`QUICK_API_REFERENCE.md`** - API endpoints reference
+- **`PHASE_1_COMPLETE.md`** - Phase 1 implementation summary
+
+### **Technical Documentation**
 - **`PRD.md`** - Product Requirements Document
 - **`Docs/Implementation.md`** - Step-by-step implementation guide
-- **`Docs/Project_structure.md`** - Detailed architecture reference
-- **`.cursor/rules/*.mdc`** - AI context for development
+- **`Docs/FINAL_ARCHITECTURE.md`** - System architecture  
+- **`Docs/DATA_FLOW_PRODUCTION.md`** - Production data flow
+- **`Docs/MORNINGSTAR_DATA_ANALYSIS.md`** - Data format analysis
+
+### **AI Context**
+- **`.cursor/rules/*.mdc`** - AI context for Phase 2 development
+  - `scoring_context.mdc` - Scoring engine logic
+  - `schema_context.mdc` - Database schema definitions
+  - `allocation_context.mdc` - Portfolio allocation logic
+
+---
+
+## **🎯 Next Steps (Phase 2)**
+
+### **Immediate Tasks:**
+1. Build Collection 3: CategoryScore schema
+2. Build Collection 4: MF_Scores schema
+3. Implement Z-Score calculator service
+4. Build qualitative converter (text → numbers in-memory)
+5. Implement composite scorer with risk weighting
+6. Create scoring cron job (runs after data ingestion)
+
+### **Future Phases:**
+- **Phase 3:** Portfolio construction & allocation
+- **Phase 4:** API endpoints for recommendations  
+- **Phase 5:** Frontend integration (see `Docs/UI_UX_doc.md`)
 
 ---
 
