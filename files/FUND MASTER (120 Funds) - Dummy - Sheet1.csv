@@ -1,0 +1,121 @@
+Fund_ID,Fund_Name,Category,NAV,AUM_Cr,5Y_CAGR,3Y_Rolling,Sharpe_3Y,Sortino_3Y,Alpha,Beta,Std_Dev,Max_DD,Recovery_Mo,Downside_Capture,Expense,Turnover,Concentration,Fund_House,Manager_Tenure,Manager_Record,AMC_Risk,ESG
+LC001,Nippon India Large Cap Fund,Large Cap,85.5,35700,18.86,85,1.22,1.52,1.5,0.95,13.8,-14.2,9,65,0.66,32,38,Tier 1,8,Excellent,Good,Strong
+LC002,ICICI Pru Bluechip Fund,Large Cap,120.4,63264,18.17,82,1.18,1.45,1.38,0.96,14.1,-15.1,10,68,0.91,35,42,Tier 1,9,Excellent,Excellent,Strong
+LC003,Canara Robeco Bluechip,Large Cap,48.3,14799,17.42,80,1.25,1.48,1.82,0.92,13.5,-13.8,8,62,0.51,28,40,Tier 1,7,Good,Good,Moderate
+LC004,Invesco India Largecap,Large Cap,78.2,1324,17.36,78,1.28,1.55,2.27,0.88,13.2,-13.5,8,60,0.75,30,39,Tier 2,6,Excellent,Good,Moderate
+LC005,SBI Bluechip Fund,Large Cap,92.15,45000,16.8,83,1.2,1.48,1.65,0.94,13.9,-14.5,9,66,0.72,31,41,Tier 1,10,Excellent,Excellent,Strong
+LC006,HDFC Top 100 Fund,Large Cap,850.25,38500,16.5,81,1.15,1.42,1.6,0.95,14.2,-15.5,10,68,0.85,35,42,Tier 1,8,Excellent,Excellent,Strong
+LC007,Mirae Asset Large Cap,Large Cap,89.45,25800,16.8,84,1.25,1.52,2,0.91,13.2,-13.2,7,63,0.65,29,37,Tier 1,7,Good,Good,Strong
+LC008,Axis Bluechip Fund,Large Cap,48.6,28500,15.8,79,1.18,1.38,1.7,0.94,13.9,-14.8,9,67,0.75,33,40,Tier 1,7,Good,Good,Moderate
+LC009,Kotak Bluechip Fund,Large Cap,425.3,29000,15.5,77,1.12,1.35,1.6,0.97,14.5,-15.8,10,70,0.85,34,43,Tier 1,6,Good,Good,Moderate
+LC010,UTI Mastershare Fund,Large Cap,185.7,18900,14.8,75,1.08,1.32,1.5,0.99,15,-16.2,11,72,0.95,36,44,Tier 1,8,Average,Average,Moderate
+MC001,Quant Mid Cap Fund,Mid Cap,245.8,8891,32.1,75,1.15,1.42,2.8,1.08,18.5,-22.5,14,78,0.59,52,48,Tier 2,5,Excellent,Good,Moderate
+MC002,HDFC Mid-Cap Opportunities,Mid Cap,168.5,65000,25.8,78,1.12,1.38,2.2,1.05,17.8,-21.2,13,75,0.98,48,46,Tier 1,9,Excellent,Excellent,Strong
+MC003,Edelweiss Mid Cap Fund,Mid Cap,95.2,12500,24.5,76,1.18,1.45,2.5,1.03,17.2,-20.5,12,73,0.82,45,45,Tier 2,7,Good,Good,Moderate
+MC004,Invesco India Mid Cap,Mid Cap,78.9,8200,24.2,77,1.2,1.48,2.6,1.02,16.8,-20,12,72,0.75,43,44,Tier 2,6,Good,Good,Moderate
+MC005,Motilal Oswal Midcap Fund,Mid Cap,82.4,33609,23.9,74,1.1,1.35,3.7,1.06,18,-21.8,13,76,0.68,50,47,Tier 2,5,Excellent,Good,Moderate
+MC006,Axis Midcap Fund,Mid Cap,68.5,22000,23.5,75,1.08,1.35,2.2,1.05,17.5,-21.5,13,75,0.88,49,46,Tier 1,6,Good,Good,Moderate
+MC007,SBI Magnum Midcap Fund,Mid Cap,155.8,18500,22.8,73,1.05,1.3,2,1.07,18.2,-22,14,77,0.92,51,48,Tier 1,7,Good,Good,Moderate
+MC008,PGIM India Midcap Opp,Mid Cap,42.3,11284,23.32,72,1.06,1.28,0.76,1.08,18.5,-22.8,14,79,0.46,48,47,Tier 2,5,Average,Average,Moderate
+MC009,Kotak Emerging Equity,Mid Cap,88.7,28000,22.5,74,1.08,1.32,1.8,1.06,17.8,-21.8,13,76,0.95,50,47,Tier 1,8,Good,Good,Moderate
+MC010,Nippon India Growth Fund,Mid Cap,3250.4,42000,22.2,73,1.05,1.3,1.6,1.07,18,-22.2,14,77,1.02,52,48,Tier 1,10,Good,Good,Moderate
+SC001,Quant Small Cap Fund,Small Cap,278.59,12000,30.5,68,0.98,1.25,3.2,1.15,22.5,-28.5,18,85,0.72,65,55,Tier 2,5,Excellent,Good,Moderate
+SC002,Bank of India Small Cap,Small Cap,194.23,8500,29.8,70,1.02,1.28,3,1.12,21.8,-27.5,17,83,0.68,62,54,Tier 2,4,Excellent,Average,Moderate
+SC003,Nippon India Small Cap,Small Cap,168.5,65922,28.5,72,1.05,1.32,2.8,1.1,21.2,-26.8,16,82,0.85,60,52,Tier 1,7,Good,Good,Moderate
+SC004,Axis Small Cap Fund,Small Cap,95.8,28000,27.8,71,1.08,1.35,2.6,1.08,20.8,-26.2,16,81,0.92,58,51,Tier 1,6,Good,Good,Moderate
+SC005,HDFC Small Cap Fund,Small Cap,88.4,36353,27.2,69,1.06,1.3,2.4,1.09,21,-26.5,16,82,0.98,59,52,Tier 1,8,Good,Good,Moderate
+SC006,Canara Robeco Small Cap,Small Cap,64.2,15500,26.8,68,1.04,1.28,2.2,1.1,21.5,-27,17,83,0.75,61,53,Tier 1,6,Good,Good,Moderate
+SC007,SBI Small Cap Fund,Small Cap,132.7,32000,26.5,69,1.02,1.26,2,1.11,21.8,-27.2,17,84,0.88,62,54,Tier 1,7,Good,Good,Moderate
+SC008,Kotak Small Cap Fund,Small Cap,245.3,25000,25.8,67,0.98,1.22,1.8,1.12,22.2,-28,18,85,0.95,64,55,Tier 1,6,Average,Good,Moderate
+SC009,Tata Small Cap Fund,Small Cap,38.5,18000,25.5,68,1,1.24,1.6,1.13,22,-27.8,17,84,0.82,63,54,Tier 2,5,Average,Average,Moderate
+SC010,Franklin India Smaller,Small Cap,125.8,12500,24.8,66,0.95,1.18,1.4,1.14,22.5,-28.5,18,86,0.92,65,56,Tier 2,7,Average,Average,Weak
+FC001,Parag Parikh Flexi Cap,Flexi-Cap,68.5,85000,24.5,82,1.25,1.55,2.8,0.92,15.2,-17.5,11,70,0.85,38,42,Tier 1,9,Excellent,Excellent,Strong
+FC002,Quant Flexi Cap Fund,Flexi-Cap,145.8,22000,28.2,78,1.18,1.48,3.2,0.98,16.8,-20.2,13,75,0.62,45,46,Tier 2,6,Excellent,Good,Moderate
+FC003,JM Flexicap Fund,Flexi-Cap,85.2,8500,22.8,76,1.12,1.38,2.2,0.95,16.2,-18.8,12,72,0.78,42,44,Tier 2,5,Good,Average,Moderate
+FC004,HDFC Flexi Cap Fund,Flexi-Cap,1250.4,72000,21.5,80,1.2,1.45,2,0.94,15.5,-17.8,11,71,0.95,40,43,Tier 1,10,Excellent,Excellent,Strong
+FC005,Canara Robeco Flexi Cap,Flexi-Cap,95.7,28000,21.2,79,1.18,1.42,1.9,0.93,15.8,-18.2,12,72,0.68,41,44,Tier 1,7,Good,Good,Strong
+FC006,Axis Flexi Cap Fund,Flexi-Cap,48.9,18500,20.8,77,1.15,1.38,1.8,0.96,16,-18.5,12,73,0.85,42,45,Tier 1,6,Good,Good,Moderate
+FC007,SBI Flexi Cap Fund,Flexi-Cap,88.3,35000,20.5,78,1.12,1.35,1.7,0.97,16.2,-18.8,12,74,0.92,43,45,Tier 1,8,Good,Good,Moderate
+FC008,ICICI Pru Flexi Cap,Flexi-Cap,125.6,42000,20.2,76,1.1,1.32,1.6,0.98,16.5,-19.2,13,75,0.98,44,46,Tier 1,7,Good,Good,Moderate
+FC009,Kotak Flexicap Fund,Flexi-Cap,52.4,25000,19.8,75,1.08,1.3,1.5,0.99,16.8,-19.5,13,76,0.88,45,47,Tier 1,6,Average,Good,Moderate
+FC010,Franklin India Flexi Cap,Flexi-Cap,965.2,15000,19.2,73,1.05,1.25,1.3,1,17,-20,13,77,0.95,46,48,Tier 2,9,Average,Average,Moderate
+IX001,Nippon India Nifty 50 Index,Index,21.63,738,13.7,78,1.05,1.28,-0.2,1,14.5,-16.5,11,98,0.08,5,52,Tier 1,5,Good,Good,Moderate
+IX002,HDFC Index Nifty 50,Index,24.32,356,14.04,79,1.06,1.29,-0.18,1,14.4,-16.4,11,98,0.1,5,52,Tier 1,6,Good,Good,Moderate
+IX003,ICICI Pru Nifty 50 Index,Index,18.5,520,13.85,78,1.05,1.28,-0.22,1,14.5,-16.6,11,98,0.12,5,52,Tier 1,5,Good,Good,Moderate
+IX004,SBI Nifty Index Fund,Index,32.8,680,13.6,77,1.04,1.27,-0.25,1,14.6,-16.7,11,99,0.15,5,52,Tier 1,7,Good,Good,Moderate
+IX005,UTI Nifty 50 Index Fund,Index,185.2,4500,13.5,77,1.03,1.26,-0.28,1,14.6,-16.8,11,99,0.18,5,52,Tier 1,8,Good,Good,Moderate
+IX006,Motilal Oswal Nifty Midcap 150,Index,38.89,2502,16.22,72,0.98,1.2,-0.3,1,18.2,-22,14,99,0.22,8,48,Tier 2,4,Average,Average,Moderate
+IX007,HDFC Nifty Next 50,Index,68.5,1200,15.8,73,1,1.22,-0.25,1,17.5,-21,13,99,0.2,7,50,Tier 1,5,Good,Good,Moderate
+IX008,Axis Nifty 100 Index,Index,25.4,850,14.2,76,1.04,1.27,-0.2,1,15.2,-17.5,11,98,0.15,6,52,Tier 1,4,Good,Good,Moderate
+IX009,ICICI Pru Sensex Index,Index,48.9,920,13.9,77,1.05,1.28,-0.22,1,14.8,-16.9,11,98,0.18,5,53,Tier 1,6,Good,Good,Moderate
+IX010,Kotak Nifty Bank Index,Index,32.5,680,12.8,71,0.95,1.15,-0.4,1,19.5,-24,15,99,0.25,8,55,Tier 1,5,Average,Average,Moderate
+IN001,Motilal Oswal S&P 500,International,32.5,8500,16.5,75,1.12,1.38,1.8,0.88,15.8,-18.5,12,72,0.5,15,45,Tier 2,6,Good,Good,Strong
+IN002,ICICI Pru US Bluechip,International,52.8,5200,15.8,73,1.08,1.32,1.6,0.9,16.2,-19,12,74,0.95,18,46,Tier 1,5,Good,Good,Strong
+IN003,Parag Parikh Flexi Cap (Intl),International,68.9,12000,18.2,80,1.22,1.5,2.2,0.85,14.8,-17.2,11,68,0.82,12,42,Tier 1,7,Excellent,Excellent,Strong
+IN004,HDFC World Equity Fund,International,32.4,4800,15.2,72,1.05,1.28,1.4,0.92,16.5,-19.5,13,75,1.05,20,47,Tier 1,6,Average,Good,Moderate
+IN005,Nippon India US Equity,International,48.5,6200,16,74,1.1,1.35,1.7,0.89,15.8,-18.8,12,73,0.88,16,45,Tier 1,5,Good,Good,Strong
+IN006,Franklin US Opportunities,International,125.6,3500,14.8,71,1.02,1.25,1.2,0.94,17,-20,13,76,1.15,22,48,Tier 2,8,Average,Average,Moderate
+IN007,Edelweiss US Technology,International,38.2,2800,19.5,68,1.15,1.42,2.5,0.82,18.5,-22.5,14,70,0.75,25,52,Tier 2,4,Good,Average,Moderate
+IN008,DSP US Flexible Equity,International,42.8,4200,15.5,72,1.08,1.3,1.5,0.91,16.2,-19.2,12,74,0.98,19,46,Tier 2,5,Average,Average,Moderate
+IN009,Aditya Birla SL Intl Equity,International,28.9,3200,14.5,70,1,1.22,1.1,0.95,17.2,-20.5,13,77,1.1,21,48,Tier 1,6,Average,Good,Moderate
+IN010,Mirae Asset Nasdaq 100,International,18.4,8500,20.2,72,1.2,1.48,2.8,0.8,19.2,-23.5,15,68,0.65,10,50,Tier 1,5,Excellent,Good,Strong
+HC001,ICICI Pru Regular Savings,Hybrid-Cons,42.5,8500,9.5,85,1.42,1.68,0.8,0.45,5.2,-6.5,6,45,0.88,25,35,Tier 1,8,Excellent,Excellent,Strong
+HC002,Canara Robeco Conservative,Hybrid-Cons,38.2,6200,9.2,83,1.38,1.62,0.7,0.48,5.5,-7,6,48,0.75,28,36,Tier 1,7,Good,Good,Strong
+HC003,Kotak Debt Hybrid Fund,Hybrid-Cons,48.9,5800,8.8,82,1.35,1.58,0.6,0.5,5.8,-7.5,7,50,0.82,30,38,Tier 1,6,Good,Good,Moderate
+HC004,SBI Conservative Hybrid,Hybrid-Cons,32.4,7500,8.5,80,1.32,1.55,0.5,0.52,6,-8,7,52,0.95,32,40,Tier 1,9,Good,Good,Moderate
+HC005,HDFC Hybrid Debt Fund,Hybrid-Cons,68.5,9200,9,84,1.4,1.65,0.75,0.46,5.4,-6.8,6,46,0.92,26,36,Tier 1,10,Excellent,Excellent,Strong
+HC006,Aditya Birla SL Regular Savings,Hybrid-Cons,52.8,4800,8.7,81,1.33,1.56,0.65,0.49,5.7,-7.2,7,49,0.88,29,37,Tier 1,7,Good,Good,Moderate
+HC007,UTI Regular Savings Fund,Hybrid-Cons,28.9,6500,8.4,79,1.3,1.52,0.55,0.51,6.2,-8.2,7,51,0.98,33,39,Tier 1,8,Average,Good,Moderate
+HC008,Axis Regular Saver Fund,Hybrid-Cons,38.6,5200,8.8,82,1.36,1.6,0.68,0.48,5.6,-7,6,48,0.85,28,37,Tier 1,6,Good,Good,Moderate
+HC009,Nippon India Hybrid Bond,Hybrid-Cons,82.4,4500,8.2,78,1.28,1.5,0.45,0.53,6.5,-8.5,8,53,1.02,35,41,Tier 1,7,Average,Good,Moderate
+HC010,Franklin India Debt Hybrid,Hybrid-Cons,95.2,3800,7.8,76,1.22,1.45,0.35,0.55,6.8,-9,8,55,1.08,38,43,Tier 2,9,Average,Average,Weak
+HE001,ICICI Pru Equity & Debt,Hybrid-Equity,268.5,42000,18.5,80,1.28,1.52,1.8,0.78,11.2,-13.5,9,65,0.92,38,40,Tier 1,10,Excellent,Excellent,Strong
+HE002,HDFC Balanced Advantage,Hybrid-Equity,425.8,110000,20.05,82,1.35,1.6,2.2,0.75,10.5,-12.8,8,62,0.85,35,38,Tier 1,12,Excellent,Excellent,Strong
+HE003,SBI Equity Hybrid Fund,Hybrid-Equity,185.2,38000,17.8,78,1.22,1.45,1.6,0.8,11.8,-14.2,10,68,0.98,40,42,Tier 1,9,Good,Good,Moderate
+HE004,Canara Robeco Equity Hybrid,Hybrid-Equity,248.9,28000,18.2,79,1.25,1.48,1.7,0.77,11.5,-13.8,9,66,0.88,37,40,Tier 1,8,Good,Good,Strong
+HE005,Mirae Asset Hybrid Equity,Hybrid-Equity,32.8,22000,19.2,81,1.32,1.58,2,0.74,10.8,-13,8,63,0.68,33,37,Tier 1,6,Excellent,Good,Strong
+HE006,Axis Dynamic Equity Fund,Hybrid-Equity,42.5,18500,17.5,77,1.2,1.42,1.5,0.82,12,-14.5,10,69,0.95,41,43,Tier 1,7,Good,Good,Moderate
+HE007,Kotak Equity Hybrid,Hybrid-Equity,52.6,25000,17.2,76,1.18,1.4,1.4,0.83,12.2,-14.8,10,70,1.02,42,44,Tier 1,8,Good,Good,Moderate
+HE008,Nippon India Balanced Adv,Hybrid-Equity,98.4,32000,18.8,80,1.3,1.55,1.9,0.76,11,-13.2,9,64,0.88,36,39,Tier 1,9,Excellent,Good,Strong
+HE009,Aditya Birla SL Equity Adv,Hybrid-Equity,68.9,15000,16.8,75,1.15,1.35,1.3,0.85,12.5,-15,11,71,1.05,43,45,Tier 1,7,Average,Good,Moderate
+HE010,UTI Balanced Advantage,Hybrid-Equity,125.7,28000,17,76,1.18,1.38,1.35,0.84,12.2,-14.5,10,70,0.98,42,44,Tier 1,10,Good,Good,Moderate
+DC001,HDFC Corporate Bond Fund,Debt-Corp,28.5,18500,7.2,88,1.65,1.92,0.4,0.25,2.8,-3.2,4,30,0.45,15,25,Tier 1,9,Excellent,Excellent,Strong
+DC002,ICICI Pru Corporate Bond,Debt-Corp,32.8,22000,7,86,1.6,1.85,0.35,0.28,3,-3.5,4,32,0.52,18,28,Tier 1,8,Excellent,Excellent,Strong
+DC003,Axis Corporate Debt Fund,Debt-Corp,18.4,12000,6.8,85,1.58,1.82,0.32,0.3,3.2,-3.8,5,35,0.48,20,30,Tier 1,7,Good,Good,Moderate
+DC004,SBI Corporate Bond Fund,Debt-Corp,48.2,15000,6.5,83,1.52,1.75,0.28,0.32,3.5,-4.2,5,38,0.58,22,32,Tier 1,10,Good,Good,Moderate
+DC005,Kotak Corporate Bond Fund,Debt-Corp,3250.4,18000,6.9,85,1.58,1.8,0.33,0.29,3.1,-3.6,5,33,0.5,19,29,Tier 1,8,Good,Good,Moderate
+DC006,Nippon India Corp Bond,Debt-Corp,68.5,14000,6.6,84,1.55,1.78,0.3,0.31,3.3,-4,5,36,0.55,21,31,Tier 1,7,Good,Good,Moderate
+DC007,Aditya Birla SL Corp Bond,Debt-Corp,125.6,16000,6.7,84,1.56,1.78,0.31,0.3,3.2,-3.8,5,34,0.52,20,30,Tier 1,9,Good,Good,Moderate
+DC008,UTI Corporate Bond Fund,Debt-Corp,18.9,13000,6.4,82,1.5,1.72,0.26,0.33,3.6,-4.5,6,40,0.62,24,34,Tier 1,8,Average,Good,Moderate
+DC009,Franklin India Corp Debt,Debt-Corp,85.2,10000,6.2,80,1.45,1.68,0.22,0.35,3.8,-4.8,6,42,0.68,26,36,Tier 2,10,Average,Average,Moderate
+DC010,DSP Corporate Bond Fund,Debt-Corp,42.3,9500,6.1,79,1.42,1.65,0.2,0.36,4,-5,6,44,0.72,28,38,Tier 2,6,Average,Average,Weak
+DS001,Aditya Birla SL Short Term,Debt-Short,52.4,8500,6.57,86,1.7,1.95,0.38,0.22,2.5,-2.8,3,25,0.42,12,22,Tier 1,8,Excellent,Excellent,Strong
+DS002,HDFC Short Term Debt Fund,Debt-Short,32.8,12000,6.8,88,1.75,2,0.42,0.2,2.2,-2.5,3,22,0.38,10,20,Tier 1,10,Excellent,Excellent,Strong
+DS003,ICICI Pru Short Term Fund,Debt-Short,68.5,15000,6.5,85,1.65,1.88,0.35,0.24,2.7,-3,4,28,0.48,14,24,Tier 1,9,Good,Excellent,Strong
+DS004,Axis Short Term Fund,Debt-Short,28.9,9800,6.4,84,1.62,1.85,0.32,0.25,2.8,-3.2,4,30,0.45,15,25,Tier 1,7,Good,Good,Moderate
+DS005,SBI Short Term Debt Fund,Debt-Short,48.2,11000,6.2,82,1.58,1.8,0.28,0.27,3,-3.5,4,32,0.52,16,27,Tier 1,8,Good,Good,Moderate
+DS006,Kotak Low Duration Fund,Debt-Short,3850.6,18000,6.3,83,1.6,1.82,0.3,0.26,2.9,-3.3,4,31,0.48,15,26,Tier 1,9,Good,Good,Moderate
+DS007,Nippon India Low Duration,Debt-Short,4250.8,14000,6.1,81,1.55,1.78,0.26,0.28,3.1,-3.6,5,33,0.55,17,28,Tier 1,7,Good,Good,Moderate
+DS008,UTI Short Term Income Fund,Debt-Short,32.4,10000,5.9,80,1.52,1.75,0.24,0.29,3.2,-3.8,5,35,0.58,18,29,Tier 1,8,Average,Good,Moderate
+DS009,Franklin India Short Term,Debt-Short,4580.2,8500,5.8,78,1.48,1.7,0.22,0.31,3.4,-4,5,37,0.62,20,31,Tier 2,9,Average,Average,Moderate
+DS010,DSP Ultra Short Fund,Debt-Short,11.85,7200,5.6,77,1.45,1.68,0.2,0.32,3.5,-4.2,6,39,0.68,22,33,Tier 2,6,Average,Average,Weak
+DB001,ICICI Pru Banking & PSU,Debt-Banking,32.5,15000,6.9,,,,,,,,,,,,,,,,,
+DB002,Axis Banking & PSU Debt,Debt-Banking,2850.4,12000,6.7,85,1.62,1.85,0.35,0.25,2.8,-3.2,4,29,0.48,16,26,Tier 1,8,Good,Good,Strong
+DB003,HDFC Banking & PSU Fund,Debt-Banking,18.5,14000,6.8,86,1.65,1.88,0.36,0.24,2.7,-3.1,4,28,0.46,15,25,Tier 1,10,Good,Excellent,Strong
+DB004,SBI Banking & PSU Fund,Debt-Banking,285.6,13000,6.5,84,1.58,1.8,0.32,0.26,3,-3.5,5,31,0.52,18,28,Tier 1,9,Good,Good,Moderate
+DB005,Kotak Banking & PSU Debt,Debt-Banking,58.2,11000,6.4,83,1.56,1.78,0.3,0.27,3.1,-3.6,5,32,0.55,19,29,Tier 1,7,Good,Good,Moderate
+DB006,Nippon India Banking PSU,Debt-Banking,18.9,10000,6.3,82,1.54,1.76,0.28,0.28,3.2,-3.8,5,34,0.58,20,30,Tier 1,8,Good,Good,Moderate
+DB007,Aditya Birla SL Banking PSU,Debt-Banking,325.4,9500,6.2,81,1.52,1.74,0.26,0.29,3.3,-4,5,35,0.62,21,31,Tier 1,8,Average,Good,Moderate
+DB008,UTI Banking PSU Fund,Debt-Banking,25.8,8800,6,80,1.48,1.7,0.24,0.3,3.4,-4.2,6,37,0.65,23,33,Tier 1,9,Average,Good,Moderate
+DB009,Mirae Asset Banking PSU,Debt-Banking,11.5,7500,5.9,79,1.45,1.68,0.22,0.31,3.5,-4.5,6,39,0.68,24,34,Tier 1,6,Average,Average,Moderate
+DB010,Franklin India Banking PSU,Debt-Banking,2850.7,6200,5.7,77,1.42,1.65,0.2,0.33,3.7,-4.8,6,41,0.75,26,36,Tier 2,10,Average,Average,Weak
+DG001,ICICI Pru Gilt Fund,Debt-Gilt,85.2,4200,6.5,82,1.55,1.78,0.28,0.18,4.2,-5.5,7,22,0.58,10,18,Tier 1,9,Good,Excellent,Strong
+DG002,SBI Magnum Gilt Fund,Debt-Gilt,58.4,5800,6.8,84,1.6,1.82,0.32,0.16,3.8,-5,6,20,0.52,8,15,Tier 1,10,Good,Good,Strong
+DG003,HDFC Gilt Fund,Debt-Gilt,68.9,6500,6.7,83,1.58,1.8,0.3,0.17,4,-5.2,7,21,0.55,9,16,Tier 1,8,Good,Good,Moderate
+DG004,Axis Gilt Fund,Debt-Gilt,14.2,3800,6.4,81,1.52,1.75,0.26,0.19,4.4,-5.8,7,24,0.62,12,20,Tier 1,7,Average,Good,Moderate
+DG005,Kotak Gilt Investment,Debt-Gilt,1450.6,4500,6.3,80,1.5,1.72,0.24,0.2,4.5,-6,8,25,0.65,13,21,Tier 1,9,Average,Good,Moderate
+DG006,Nippon India Gilt Fund,Debt-Gilt,38.5,3500,6.2,79,1.48,1.7,0.22,0.21,4.6,-6.2,8,26,0.68,14,22,Tier 1,8,Average,Good,Moderate
+DG007,UTI Gilt Fund,Debt-Gilt,68.2,5200,6.5,81,1.54,1.76,0.28,0.19,4.3,-5.6,7,23,0.6,11,19,Tier 1,10,Good,Good,Moderate
+DG008,Aditya Birla SL Gilt Fund,Debt-Gilt,42.8,3200,6.1,78,1.46,1.68,0.2,0.22,4.8,-6.5,8,28,0.72,15,24,Tier 1,7,Average,Average,Moderate
+DG009,DSP Government Securities,Debt-Gilt,52.6,2800,5.9,76,1.42,1.65,0.18,0.24,5,-6.8,9,30,0.78,17,26,Tier 2,6,Average,Average,Weak
+DG010,Franklin India Gilt Fund,Debt-Gilt,88.9,2500,5.7,75,1.38,1.62,0.16,0.25,5.2,-7,9,32,0.82,18,28,Tier 2,9,Average,Average,Weak
