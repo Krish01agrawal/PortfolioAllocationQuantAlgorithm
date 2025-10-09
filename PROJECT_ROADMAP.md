@@ -101,29 +101,103 @@
      timestamp: ISODate("2025-10-01"),
      category_name: "Large Cap Equity",
      mutual_fund_category_id: ObjectId(),  // References Collection 3
-     mf_dec_scores: [
+     
+     // Category-level statistics (same for all funds)
+     category_stats: {
+       total_funds: 50,
+       parameters: {
+         '5Y_CAGR': { mean: 7.8, stdev: 1.8 },
+         'Sharpe_3Y': { mean: 8.2, stdev: 1.5 },
+         // ... all 27 parameters
+       }
+     },
+     
+     // Fund-level data (risk-agnostic)
+     funds_data: [
        {
-         fund_name: "Nippon India Large Cap Fund",
          fund_id: ObjectId(),  // References Collection 1
-         raw_scores: {
+         fund_name: "Nippon India Large Cap Fund",
+         
+         raw_values: {
            '5Y_CAGR': 18.86,
            'Sharpe_3Y': 1.22,
-           'Fund_House': 5,      // Converted from "Tier 1"
-           'Manager_Record': 5,   // Converted from "Excellent"
+           'Fund_House': "Tier 1",      // Stored AS-IS
+           'Manager_Record': "Excellent", // Stored AS-IS
            // ... all 27 parameters
          },
-         z_scores: {
-           '5Y_CAGR_zscore': 1.23,
-           'Sharpe_3Y_zscore': 0.89,
-           // ... normalized scores
+         
+         points: {
+           '5Y_CAGR': 10,        // ≥15% → 10 pts
+           'Sharpe_3Y': 10,      // ≥1.2 → 10 pts
+           'Fund_House': 10,     // "Tier 1" → 10 pts
+           'Manager_Record': 10, // "Excellent" → 10 pts
+           // ... all 27 parameters
          },
-         composite_score: 87.5,
-         rank: 1
+         
+         z_scores: {
+           '5Y_CAGR_zscore': 1.22,
+           'Sharpe_3Y_zscore': 1.20,
+           // ... normalized scores (same across all risk profiles)
+         }
+       }
+       // ... all funds in category
+     ],
+     
+     // ⚠️ CRITICAL: Risk-profile-specific scores and rankings
+     risk_profile_scores: [
+       {
+         risk_profile: "Aggressive Explorer",
+         weighted_scores: [
+           {
+             fund_id: ObjectId(),
+             fund_name: "Nippon India Large Cap Fund",
+             composite_score: 87.5,  // High score (returns weighted more)
+             rank: 1
+           },
+           {
+             fund_id: ObjectId(),
+             fund_name: "ICICI Bluechip Fund",
+             composite_score: 82.1,
+             rank: 3
+           }
+         ]
+       },
+       {
+         risk_profile: "Safety Seeker",
+         weighted_scores: [
+           {
+             fund_id: ObjectId(),
+             fund_name: "ICICI Bluechip Fund",  // Different top fund!
+             composite_score: 82.3,  // Higher score (risk weighted more)
+             rank: 1
+           },
+           {
+             fund_id: ObjectId(),
+             fund_name: "Nippon India Large Cap Fund",
+             composite_score: 79.1,  // Lower score, lower rank
+             rank: 3
+           }
+         ]
+       },
+       {
+         risk_profile: "Balanced Achiever",
+         weighted_scores: [ /* ... */ ]
+       },
+       {
+         risk_profile: "Conservative Guardian",
+         weighted_scores: [ /* ... */ ]
        }
      ],
+     
      createdAt: ISODate()
    }
    ```
+   
+   **Why Risk Profiles Matter:**
+   - Each risk profile has DIFFERENT weightages for parameters
+   - Same Z-scores, but different weights → different composite scores
+   - Rankings differ by risk profile (top fund for Aggressive ≠ top fund for Safety Seeker)
+   - See `Docs/SCORING_ENGINE_DEEP_DIVE.md` for complete explanation
 
 #### **Services to Build:**
 
@@ -135,24 +209,39 @@
    - [ ] `src/modules/scoring/dao/category-score.dao.ts`
    - [ ] `src/modules/scoring/dao/mf-scores.dao.ts`
 
-3. **✅ Core Services**
+3. **✅ Core Services** (4-Step Process)
+   
+   **Step 1: Points Assignment Service**
+   - [ ] `src/modules/scoring/services/points-assignment.service.ts`
+     - Convert raw Morningstar values to points (0, 3, 5, 7, 10)
+     - Handle quantitative ranges (e.g., 5Y_CAGR: ≥15% → 10pts)
+     - Convert qualitative text to points:
+       - Fund_House: "Tier 1" → 10, "Strong Tier 2" → 7, "Tier 2" → 5, etc.
+       - Manager_Record: "Excellent" → 10, "Good" → 7, "Average" → 5, etc.
+       - AMC_Risk: "Excellent" → 10, "Good" → 7, "Average" → 5, etc.
+       - ESG: "Strong" → 10, "Moderate" → 7, "Neutral" → 5, etc.
+     - Apply "lower is better" logic (e.g., lower expense → higher points)
+   
+   **Step 2: Category Statistics Service**
+   - [ ] `src/modules/scoring/services/category-stats.service.ts`
+     - Calculate mean for each parameter across all funds in category
+     - Calculate standard deviation for each parameter
+     - Store in `category_stats` section of Collection 4
+   
+   **Step 3: Z-Score Calculator Service**
    - [ ] `src/modules/scoring/services/z-score-calculator.service.ts`
-     - Calculate mean & standard deviation within category
-     - Compute Z-scores for all quantitative parameters
+     - Compute Z-scores: `(points - category_mean) / category_stdev`
      - Handle outliers (cap at ±3 standard deviations)
+     - Apply directional adjustment (invert for "lower is better" params)
+     - Z-scores are SAME across all risk profiles (normalized values)
    
-   - [ ] `src/modules/scoring/services/qualitative-converter.service.ts`
-     - Convert text to numbers (in-memory only):
-       - Fund_House: "Tier 1" → 5, "Tier 2" → 3, "Tier 3" → 1
-       - Manager_Record: "Excellent" → 5, "Good" → 4, "Average" → 3, "Poor" → 1
-       - AMC_Risk: "Excellent" → 5, "Good" → 4, "Average" → 3, "Poor" → 1
-       - ESG: "Strong" → 5, "Moderate" → 3, "Weak" → 1
-   
+   **Step 4: Composite Scorer Service**
    - [ ] `src/modules/scoring/services/composite-scorer.service.ts`
-     - Apply risk profile weights to normalized scores
-     - Calculate weighted composite score
-     - Rank funds within category
-     - Generate directional values (higher-is-better vs lower-is-better)
+     - Load risk profile weights from config
+     - Calculate weighted composite score for EACH risk profile:
+       `Composite_Score = Σ(Z_Score * Weight_for_RiskProfile)`
+     - Rank funds separately for EACH risk profile
+     - Store in `risk_profile_scores` array (4 entries per category)
 
 4. **✅ Risk Profile Weighting**
    - [ ] `src/modules/scoring/weights/risk-profile-weights.ts`
@@ -168,36 +257,103 @@
      - Stores scores in Collections 3 & 4
      - Logs results & sends alerts
 
-#### **Weight Configuration (Example: Safety Seeker)**
+#### **Weight Configuration (Based on Weightage Table)**
 
+**Aggressive Explorer (Growth-focused):**
 ```typescript
-// Safety Seeker weights (emphasizes risk management)
 {
-  // Quantitative (60%)
-  '5Y_CAGR': 0.08,
-  '3Y_Rolling': 0.08,
-  'Sharpe_3Y': 0.12,
-  'Sortino_3Y': 0.10,
-  'Alpha': 0.05,
-  'Beta': 0.03,
-  'Std_Dev': 0.04,
-  'Max_DD': 0.15,           // High weight for risk
-  'Recovery_Mo': 0.06,
-  'Downside_Capture': 0.08,
-  'Expense': 0.08,
-  'Turnover': 0.03,
-  'Concentration': 0.05,
+  // Returns & Growth (25%)
+  '5Y_CAGR': 0.125,                    // 25% / 2 params
+  '3Y_Rolling': 0.125,
   
-  // Qualitative (30%)
-  'Fund_House': 0.10,
-  'Manager_Tenure': 0.04,
-  'Manager_Record': 0.08,
-  'AMC_Risk': 0.10,
+  // Risk-Adjusted Metrics (15%)
+  'Sharpe_3Y': 0.0375,                 // 15% / 4 params
+  'Sortino_3Y': 0.0375,
+  'Alpha': 0.0375,
+  'Beta': 0.0375,
   
-  // Forward-Looking (10%)
-  'ESG': 0.05
+  // Volatility & Drawdown (10%)
+  'Std_Dev': 0.0333,                   // 10% / 3 params
+  'Max_DD': 0.0333,
+  'Recovery_Mo': 0.0333,
+  
+  // Expense Ratio & AUM (10%)
+  'Expense': 0.05,                     // 10% / 2 params
+  'AUM_Cr': 0.05,
+  
+  // Downside Capture / Liquidity (5%)
+  'Downside_Capture': 0.025,           // 5% / 2 params
+  'Liquidity_Redemption': 0.025,
+  
+  // Fund House & Manager Quality (10%)
+  'Fund_House': 0.025,                 // 10% / 4 params
+  'Manager_Tenure': 0.025,
+  'Manager_Record': 0.025,
+  'AMC_Risk': 0.025,
+  
+  // Portfolio Discipline & Turnover (10%)
+  'Concentration': 0.0333,             // 10% / 3 params
+  'Turnover': 0.0333,
+  'Style_Fit': 0.0333,
+  
+  // ESG / Forward-Looking (15%)
+  'ESG': 0.025,                        // 15% / 6 params
+  'Benchmark_Consistency': 0.025,
+  'Peer_Comparison': 0.025,
+  'Tax_Efficiency': 0.025,
+  'Fund_Innovation': 0.025,
+  'Forward_Risk_Mitigation': 0.025
 }
 ```
+
+**Safety Seeker (Risk-focused):**
+```typescript
+{
+  // Returns & Growth (10%) - LOWER priority
+  '5Y_CAGR': 0.05,                     // 10% / 2 params
+  '3Y_Rolling': 0.05,
+  
+  // Risk-Adjusted Metrics (10%)
+  'Sharpe_3Y': 0.025,                  // 10% / 4 params
+  'Sortino_3Y': 0.025,
+  'Alpha': 0.025,
+  'Beta': 0.025,
+  
+  // Volatility & Drawdown (20%) - HIGHER priority
+  'Std_Dev': 0.0667,                   // 20% / 3 params
+  'Max_DD': 0.0667,
+  'Recovery_Mo': 0.0667,
+  
+  // Expense Ratio & AUM (20%) - HIGHER priority
+  'Expense': 0.10,                     // 20% / 2 params
+  'AUM_Cr': 0.10,
+  
+  // Downside Capture / Liquidity (15%)
+  'Downside_Capture': 0.075,           // 15% / 2 params
+  'Liquidity_Redemption': 0.075,
+  
+  // Fund House & Manager Quality (10%)
+  'Fund_House': 0.025,                 // 10% / 4 params
+  'Manager_Tenure': 0.025,
+  'Manager_Record': 0.025,
+  'AMC_Risk': 0.025,
+  
+  // Portfolio Discipline & Turnover (10%)
+  'Concentration': 0.0333,             // 10% / 3 params
+  'Turnover': 0.0333,
+  'Style_Fit': 0.0333,
+  
+  // ESG / Forward-Looking (5%) - LOWER priority
+  'ESG': 0.00833,                      // 5% / 6 params
+  'Benchmark_Consistency': 0.00833,
+  'Peer_Comparison': 0.00833,
+  'Tax_Efficiency': 0.00833,
+  'Fund_Innovation': 0.00833,
+  'Forward_Risk_Mitigation': 0.00833
+}
+```
+
+**Balanced Achiever & Conservative Guardian:** See `Docs/SCORING_ENGINE_DEEP_DIVE.md` for complete weight tables.
 
 #### **Testing Plan:**
 - [ ] Unit tests for Z-score calculator

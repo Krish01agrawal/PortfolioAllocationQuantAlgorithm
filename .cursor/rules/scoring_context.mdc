@@ -1,148 +1,718 @@
 # Scoring Engine Context (NestJS/TypeScript)
 
-## Core Algorithm Knowledge
+## ⚠️ CRITICAL: Understanding the 4-Step Scoring Process
 
-### Z-Score Calculation
-When working with scoring logic, remember:
+**Based on Parameters Table, Weightage Table, and Scoring Formulas**
 
-1. **Category Isolation**: Z-scores are ALWAYS calculated per category (Large Cap funds only compete with Large Cap, not with Debt funds)
+The scoring engine has **4 distinct steps**, and **composite scores differ by risk profile**.
 
-2. **Directionality First**: Before calculating mean/stddev, apply directionality:
-   - **Higher is better**: Use value as-is (CAGR, Sharpe, Alpha, AUM, fund reputation)
-   - **Lower is better**: Multiply by -1 (Beta, StdDev, Expense Ratio, Drawdown, Recovery Period)
+---
 
-3. **Formula**:
-   ```typescript
-   const directionalValue = lowerIsBetter.includes(param) ? -rawValue : rawValue;
-   const categoryMean = mean(directionalValues);
-   const categoryStddev = standardDeviation(directionalValues);
-   const zScore = (directionalValue - categoryMean) / categoryStddev;
-   ```
+## Step 1: Points Assignment
 
-4. **Handle Edge Cases**:
-   - If category has <3 funds: Skip Z-score calculation (log warning)
-   - If stddev = 0 (all funds same value): Set stddev = 1.0 to avoid division by zero
-   - If parameter is null/undefined: Skip this fund for this parameter only
+### Concept
+Convert raw Morningstar values to **points** (0, 3, 5, 7, 10) based on predefined ranges.
 
-### Group Scoring
-27 parameters are grouped into 8 categories:
+### Quantitative Parameters (Range-Based)
 
-1. **returns_growth** (3 params): 5Y CAGR equity, 5Y CAGR debt/hybrid, 3Y rolling consistency
-2. **risk_adjusted** (4 params): Sharpe, Sortino, Alpha, Beta
-3. **volatility_drawdown** (4 params): Std Dev equity/debt, Max Drawdown, Recovery Period
-4. **expense_aum** (4 params): Expense ratio equity/debt, AUM equity/debt
-5. **downside_liquidity** (2 params): Downside capture ratio, Liquidity risk
-6. **fund_house_mgr** (4 params): Fund house reputation, Manager tenure, Track record, AMC risk mgmt
-7. **discipline_turnover** (3 params): Turnover ratio, Concentration/sector fit, Style fit
-8. **esg_forward** (6 params): ESG governance, Benchmark consistency, Peer comparison, Tax efficiency, Innovation, Risk mitigation
-
-**Group Score** = Average of Z-scores within that group (ignore nulls)
-
-### Composite Scoring
-Final score varies by risk profile due to different weightage:
-
-```python
-# Aggressive Explorer weights
-{
-  'returns_growth': 0.25,
-  'risk_adjusted': 0.15,
-  'volatility_drawdown': 0.10,
-  'expense_aum': 0.10,
-  'downside_liquidity': 0.05,
-  'fund_house_mgr': 0.10,
-  'discipline_turnover': 0.10,
-  'esg_forward': 0.15
-}
-
-# Safety Seeker weights (different priorities)
-{
-  'returns_growth': 0.10,
-  'risk_adjusted': 0.10,
-  'volatility_drawdown': 0.20,  # Higher focus on stability
-  'expense_aum': 0.20,
-  'downside_liquidity': 0.15,
-  'fund_house_mgr': 0.10,
-  'discipline_turnover': 0.10,
-  'esg_forward': 0.05
-}
-```
-
-**Composite Score** = Σ(group_score × weight) for all 8 groups
-
-### Ranking
-Within each category:
-1. Sort funds by composite_score DESC
-2. Assign rank: 1, 2, 3, ...
-3. Store in Collection 4 (mf_scores)
-
-## Code Patterns (TypeScript/NestJS)
-
-### When implementing Z-score calculator:
 ```typescript
-// ALWAYS load directionality config in constructor
-constructor() {
-  const configPath = join(process.cwd(), 'src/config/json/directionality.json');
-  this.directionalityConfig = JSON.parse(readFileSync(configPath, 'utf-8'));
-}
+// Example: 5Y CAGR (Equity)
+const assign5YCAGRPoints = (value: number): number => {
+  if (value >= 15) return 10;   // Excellent
+  if (value >= 12) return 7;    // Good
+  if (value >= 10) return 5;    // Average
+  if (value >= 8) return 3;     // Below average
+  return 0;                     // Poor
+};
 
-// ALWAYS check category size
-const funds = await this.mfSchemeDataModel.find({ fundCategory: categoryName }).lean();
-if (funds.length < 3) {
-  this.logger.warn(`Skipping ${categoryName}: only ${funds.length} funds`);
-  return [];
-}
+// Example: Sharpe Ratio (3Y)
+const assignSharpePoints = (value: number): number => {
+  if (value >= 1.2) return 10;
+  if (value >= 1.0) return 7;
+  if (value >= 0.8) return 5;
+  if (value >= 0.6) return 3;
+  return 0;
+};
 
-// ALWAYS handle null/undefined values
-const values = funds
-  .map(f => f[param])
-  .filter(v => v !== null && v !== undefined && !isNaN(v));
+// Example: Max Drawdown (Lower is better!)
+const assignMaxDDPoints = (value: number): number => {
+  // Note: value is negative (e.g., -14.2%)
+  const absValue = Math.abs(value);
+  if (absValue <= 12) return 10;   // Low drawdown = Good
+  if (absValue <= 18) return 7;
+  if (absValue <= 22) return 5;
+  if (absValue <= 28) return 3;
+  return 0;                         // High drawdown = Bad
+};
+
+// Example: Expense Ratio (Lower is better!)
+const assignExpensePoints = (value: number): number => {
+  if (value <= 1.5) return 10;      // Low expense = Good
+  if (value <= 2.0) return 7;
+  if (value <= 2.5) return 5;
+  if (value <= 3.0) return 3;
+  return 0;                         // High expense = Bad
+};
 ```
 
-### When implementing group scorer:
+### Qualitative Parameters (Text → Points)
+
 ```typescript
-// ALWAYS load weightage config
-const configPath = join(process.cwd(), 'src/config/json/weightage.json');
-const config = JSON.parse(readFileSync(configPath, 'utf-8'));
-const groups = config.parameterGroups;
+// Fund House Reputation
+const assignFundHousePoints = (value: string): number => {
+  const mapping = {
+    'Tier 1': 10,
+    'Strong Tier 2': 7,
+    'Tier 2': 5,
+    'Tier 3': 3,
+    'New/Unknown': 0,
+  };
+  return mapping[value] || 0;
+};
 
-// ALWAYS average only non-null Z-scores
-const groupScore = mean(
-  Object.values(zScores).filter(z => z !== null && z !== undefined)
-);
+// Manager Record / AMC Risk
+const assignQualitativePoints = (value: string): number => {
+  const mapping = {
+    'Excellent': 10,
+    'Good': 7,
+    'Average': 5,
+    'Below Avg': 3,
+    'Poor': 0,
+  };
+  return mapping[value] || 0;
+};
+
+// ESG
+const assignESGPoints = (value: string): number => {
+  const mapping = {
+    'Strong': 10,
+    'Moderate': 7,
+    'Neutral': 5,
+    'Weak': 3,
+    'Poor': 0,
+  };
+  return mapping[value] || 0;
+};
 ```
+
+### Service Implementation Pattern
+
+```typescript
+@Injectable()
+export class PointsAssignmentService {
+  private readonly logger = new Logger(PointsAssignmentService.name);
+  
+  /**
+   * Convert raw Morningstar values to points for all parameters
+   */
+  assignPoints(fundData: MfSchemeDataMonthwise): ParameterPoints {
+    const points: ParameterPoints = {};
+    
+    // Quantitative parameters
+    if (fundData['5Y_CAGR'] !== null) {
+      points['5Y_CAGR'] = this.assign5YCAGRPoints(fundData['5Y_CAGR']);
+    }
+    
+    if (fundData['Sharpe_3Y'] !== null) {
+      points['Sharpe_3Y'] = this.assignSharpePoints(fundData['Sharpe_3Y']);
+    }
+    
+    // ... all 27 parameters
+    
+    // Qualitative parameters
+    if (fundData['Fund_House']) {
+      points['Fund_House'] = this.assignFundHousePoints(fundData['Fund_House']);
+    }
+    
+    if (fundData['Manager_Record']) {
+      points['Manager_Record'] = this.assignQualitativePoints(fundData['Manager_Record']);
+    }
+    
+    return points;
+  }
+  
+  private assign5YCAGRPoints(value: number): number {
+    if (value >= 15) return 10;
+    if (value >= 12) return 7;
+    if (value >= 10) return 5;
+    if (value >= 8) return 3;
+    return 0;
+  }
+  
+  // ... all parameter assignment methods
+}
+```
+
+---
+
+## Step 2: Category-Level Statistics
+
+### Concept
+Calculate **mean** and **standard deviation** of **POINTS** (not raw values) for each parameter within a category.
+
+### Formula
+
+```typescript
+// Category Mean
+Category_Mean(parameter) = Σ(points) / total_funds
+
+// Category Standard Deviation
+Category_StdDev(parameter) = √[Σ(points - mean)² / (total_funds - 1)]
+```
+
+### Service Implementation Pattern
+
+```typescript
+@Injectable()
+export class CategoryStatsService {
+  private readonly logger = new Logger(CategoryStatsService.name);
+  
+  /**
+   * Calculate mean and stdev for all parameters in a category
+   */
+  calculateCategoryStats(
+    categoryName: string,
+    fundsPoints: Array<{ fundId: string; points: ParameterPoints }>,
+  ): CategoryStats {
+    const stats: CategoryStats = {
+      total_funds: fundsPoints.length,
+      parameters: {},
+    };
+    
+    // For each parameter
+    const parameterNames = this.getAllParameterNames();
+    
+    for (const param of parameterNames) {
+      // Extract points for this parameter across all funds
+      const values = fundsPoints
+        .map(f => f.points[param])
+        .filter(v => v !== null && v !== undefined);
+      
+      if (values.length < 2) {
+        this.logger.warn(`Skipping ${param}: insufficient data`);
+        continue;
+      }
+      
+      // Calculate mean
+      const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
+      
+      // Calculate stdev (sample, ddof=1)
+      const variance = values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / (values.length - 1);
+      const stdev = Math.sqrt(variance);
+      
+      // Handle edge case: all funds have same points
+      stats.parameters[param] = {
+        mean,
+        stdev: stdev === 0 ? 1.0 : stdev,  // Avoid division by zero
+      };
+    }
+    
+    return stats;
+  }
+}
+```
+
+---
+
+## Step 3: Z-Score Normalization
+
+### Concept
+Calculate **Z-scores** for each fund using the formula:
+
+```
+Z-Score(parameter) = (points - category_mean) / category_stdev
+```
+
+**CRITICAL:** Z-scores are the **SAME across all risk profiles** because they're just normalized values.
+
+### Service Implementation Pattern
+
+```typescript
+@Injectable()
+export class ZScoreCalculatorService {
+  private readonly logger = new Logger(ZScoreCalculatorService.name);
+  
+  /**
+   * Calculate Z-scores for all parameters of a fund
+   */
+  calculateZScores(
+    fundPoints: ParameterPoints,
+    categoryStats: CategoryStats,
+  ): ParameterZScores {
+    const zScores: ParameterZScores = {};
+    
+    for (const [param, points] of Object.entries(fundPoints)) {
+      if (points === null || points === undefined) {
+        zScores[`${param}_zscore`] = null;
+        continue;
+      }
+      
+      const stats = categoryStats.parameters[param];
+      if (!stats) {
+        this.logger.warn(`No stats for ${param}, skipping`);
+        zScores[`${param}_zscore`] = null;
+        continue;
+      }
+      
+      // Calculate Z-score
+      let zScore = (points - stats.mean) / stats.stdev;
+      
+      // Cap outliers at ±3 standard deviations
+      if (zScore > 3) zScore = 3;
+      if (zScore < -3) zScore = -3;
+      
+      // Apply directional adjustment (for "lower is better" params)
+      if (this.isLowerBetter(param)) {
+        zScore = -zScore;
+      }
+      
+      zScores[`${param}_zscore`] = zScore;
+    }
+    
+    return zScores;
+  }
+  
+  /**
+   * Parameters where lower values are better
+   */
+  private isLowerBetter(param: string): boolean {
+    const lowerIsBetterParams = [
+      'Beta',
+      'Std_Dev',
+      'Max_DD',
+      'Recovery_Mo',
+      'Expense',
+      'Turnover',
+      'Downside_Capture',
+    ];
+    return lowerIsBetterParams.includes(param);
+  }
+}
+```
+
+### Key Points
+
+1. **Z-scores are calculated from POINTS, not raw values**
+2. **Z-scores are universal** (same across all risk profiles)
+3. **Outliers are capped** at ±3 standard deviations
+4. **Directional adjustment** for "lower is better" parameters
+
+---
+
+## Step 4: Risk-Profile-Specific Composite Scoring
+
+### Concept
+Apply **different weightages** based on **risk profile**, resulting in **DIFFERENT composite scores** for the same fund.
+
+### Weightage Configuration
+
+**Source:** Weightage Recommendations Table (Image 2)
+
+```typescript
+// Risk Profile Weights (Group-Level)
+export const RISK_PROFILE_WEIGHTS = {
+  'Aggressive Explorer': {
+    returns_growth: 0.25,           // 25%
+    risk_adjusted: 0.15,            // 15%
+    volatility_drawdown: 0.10,      // 10%
+    expense_aum: 0.10,              // 10%
+    downside_liquidity: 0.05,       // 5%
+    fund_house_mgr: 0.10,           // 10%
+    discipline_turnover: 0.10,      // 10%
+    esg_forward: 0.15,              // 15%
+  },
+  
+  'Balanced Achiever': {
+    returns_growth: 0.20,           // 20%
+    risk_adjusted: 0.15,            // 15%
+    volatility_drawdown: 0.15,      // 15%
+    expense_aum: 0.10,              // 10%
+    downside_liquidity: 0.10,       // 10%
+    fund_house_mgr: 0.10,           // 10%
+    discipline_turnover: 0.10,      // 10%
+    esg_forward: 0.10,              // 10%
+  },
+  
+  'Conservative Guardian': {
+    returns_growth: 0.15,           // 15%
+    risk_adjusted: 0.10,            // 10%
+    volatility_drawdown: 0.15,      // 15%
+    expense_aum: 0.15,              // 15%
+    downside_liquidity: 0.15,       // 15%
+    fund_house_mgr: 0.15,           // 15%
+    discipline_turnover: 0.10,      // 10%
+    esg_forward: 0.05,              // 5%
+  },
+  
+  'Safety Seeker': {
+    returns_growth: 0.10,           // 10% - LOWER
+    risk_adjusted: 0.10,            // 10%
+    volatility_drawdown: 0.20,      // 20% - HIGHER
+    expense_aum: 0.20,              // 20% - HIGHER
+    downside_liquidity: 0.15,       // 15%
+    fund_house_mgr: 0.10,           // 10%
+    discipline_turnover: 0.10,      // 10%
+    esg_forward: 0.05,              // 5% - LOWER
+  },
+};
+
+// Parameter Groups (27 parameters → 8 groups)
+export const PARAMETER_GROUPS = {
+  returns_growth: ['5Y_CAGR', '3Y_Rolling'],  // 2 params
+  risk_adjusted: ['Sharpe_3Y', 'Sortino_3Y', 'Alpha', 'Beta'],  // 4 params
+  volatility_drawdown: ['Std_Dev', 'Max_DD', 'Recovery_Mo'],  // 3 params
+  expense_aum: ['Expense', 'AUM_Cr'],  // 2 params
+  downside_liquidity: ['Downside_Capture', 'Liquidity_Redemption'],  // 2 params
+  fund_house_mgr: ['Fund_House', 'Manager_Tenure', 'Manager_Record', 'AMC_Risk'],  // 4 params
+  discipline_turnover: ['Concentration', 'Turnover', 'Style_Fit'],  // 3 params
+  esg_forward: ['ESG', 'Benchmark_Consistency', 'Peer_Comparison', 'Tax_Efficiency', 'Fund_Innovation', 'Forward_Risk_Mitigation'],  // 6 params
+};
+```
+
+### Composite Score Calculation
+
+```typescript
+@Injectable()
+export class CompositeScorerService {
+  private readonly logger = new Logger(CompositeScorerService.name);
+  
+  /**
+   * Calculate composite score for a specific risk profile
+   */
+  calculateCompositeScore(
+    fundZScores: ParameterZScores,
+    riskProfile: RiskProfile,
+  ): number {
+    const groupWeights = RISK_PROFILE_WEIGHTS[riskProfile];
+    let compositeScore = 0;
+    
+    // For each parameter group
+    for (const [groupName, groupWeight] of Object.entries(groupWeights)) {
+      const params = PARAMETER_GROUPS[groupName];
+      
+      // Calculate average Z-score for this group
+      const groupZScores = params
+        .map(param => fundZScores[`${param}_zscore`])
+        .filter(z => z !== null && z !== undefined);
+      
+      if (groupZScores.length === 0) {
+        this.logger.warn(`No Z-scores for group ${groupName}`);
+        continue;
+      }
+      
+      const groupScore = groupZScores.reduce((sum, z) => sum + z, 0) / groupZScores.length;
+      
+      // Apply group weight
+      compositeScore += groupScore * groupWeight;
+    }
+    
+    return compositeScore;
+  }
+  
+  /**
+   * Calculate scores for ALL risk profiles
+   */
+  async calculateAllRiskProfiles(
+    categoryName: string,
+    fundsData: Array<{
+      fundId: string;
+      fundName: string;
+      zScores: ParameterZScores;
+    }>,
+  ): Promise<RiskProfileScores[]> {
+    const riskProfiles: RiskProfile[] = [
+      'Aggressive Explorer',
+      'Balanced Achiever',
+      'Conservative Guardian',
+      'Safety Seeker',
+    ];
+    
+    const results: RiskProfileScores[] = [];
+    
+    for (const riskProfile of riskProfiles) {
+      const weightedScores = [];
+      
+      for (const fund of fundsData) {
+        const compositeScore = this.calculateCompositeScore(fund.zScores, riskProfile);
+        
+        weightedScores.push({
+          fund_id: fund.fundId,
+          fund_name: fund.fundName,
+          composite_score: compositeScore,
+          rank: 0,  // Will be assigned after sorting
+        });
+      }
+      
+      // Sort by composite score DESC
+      weightedScores.sort((a, b) => b.composite_score - a.composite_score);
+      
+      // Assign ranks
+      weightedScores.forEach((score, index) => {
+        score.rank = index + 1;
+      });
+      
+      results.push({
+        risk_profile: riskProfile,
+        weighted_scores: weightedScores,
+      });
+    }
+    
+    return results;
+  }
+}
+```
+
+---
+
+## ⚠️ CRITICAL: Why Rankings Differ by Risk Profile
+
+### Example: Two Funds in Large Cap Equity
+
+**Fund A: "Growth Star"**
+- High 5Y CAGR (10 points → Z-score: +1.5)
+- High Alpha (10 points → Z-score: +1.2)
+- High Volatility (3 points → Z-score: -1.0)
+- High Expense (3 points → Z-score: -0.8)
+
+**Fund B: "Steady Performer"**
+- Moderate 5Y CAGR (7 points → Z-score: +0.3)
+- Moderate Alpha (7 points → Z-score: +0.2)
+- Low Volatility (10 points → Z-score: +1.5)
+- Low Expense (10 points → Z-score: +1.2)
+
+### Composite Scores:
+
+**Aggressive Explorer (High Returns Weight):**
+```
+Fund A Score = (1.5 * 0.125) + (1.2 * 0.0375) + (-1.0 * 0.0333) + (-0.8 * 0.05) + ...
+             = 0.1875 + 0.045 - 0.0333 - 0.04 + ... = 0.85
+             
+Fund B Score = (0.3 * 0.125) + (0.2 * 0.0375) + (1.5 * 0.0333) + (1.2 * 0.05) + ...
+             = 0.0375 + 0.0075 + 0.05 + 0.06 + ... = 0.68
+
+Ranking: Fund A (Rank 1), Fund B (Rank 2)
+```
+
+**Safety Seeker (High Risk Weight):**
+```
+Fund A Score = (1.5 * 0.05) + (1.2 * 0.025) + (-1.0 * 0.0667) + (-0.8 * 0.10) + ...
+             = 0.075 + 0.03 - 0.0667 - 0.08 + ... = 0.51
+             
+Fund B Score = (0.3 * 0.05) + (0.2 * 0.025) + (1.5 * 0.0667) + (1.2 * 0.10) + ...
+             = 0.015 + 0.005 + 0.1 + 0.12 + ... = 0.82
+
+Ranking: Fund B (Rank 1), Fund A (Rank 2)  ← REVERSED!
+```
+
+**Key Insight:** Same Z-scores, different weights → different composite scores → different rankings!
+
+---
+
+## MongoDB Collection 4 Schema
+
+```typescript
+@Schema({ collection: 'mfScores', timestamps: true })
+export class MfScores extends Document {
+  @Prop({ required: true, type: Date, index: true })
+  timestamp: Date;
+  
+  @Prop({ required: true, index: true })
+  category_name: string;
+  
+  @Prop({ required: true, type: Types.ObjectId, ref: 'CategoryScore' })
+  mutual_fund_category_id: Types.ObjectId;
+  
+  // Category-level statistics
+  @Prop({ type: Object })
+  category_stats: {
+    total_funds: number;
+    parameters: {
+      [key: string]: {
+        mean: number;
+        stdev: number;
+      };
+    };
+  };
+  
+  // Fund-level data (risk-agnostic)
+  @Prop({ type: [Object] })
+  funds_data: Array<{
+    fund_id: Types.ObjectId;
+    fund_name: string;
+    raw_values: Record<string, any>;
+    points: Record<string, number>;
+    z_scores: Record<string, number>;
+  }>;
+  
+  // ⚠️ CRITICAL: Risk-profile-specific scores
+  @Prop({ type: [Object] })
+  risk_profile_scores: Array<{
+    risk_profile: string;
+    weighted_scores: Array<{
+      fund_id: Types.ObjectId;
+      fund_name: string;
+      composite_score: number;
+      rank: number;
+    }>;
+  }>;
+}
+```
+
+---
+
+## Complete Scoring Workflow
+
+```typescript
+@Injectable()
+export class ScoringEngineService {
+  constructor(
+    private readonly pointsAssignment: PointsAssignmentService,
+    private readonly categoryStats: CategoryStatsService,
+    private readonly zScoreCalculator: ZScoreCalculatorService,
+    private readonly compositeScorer: CompositeScorerService,
+    private readonly mfScoresDao: MfScoresDao,
+  ) {}
+  
+  async scoreCategory(categoryName: string, timestamp: Date): Promise<void> {
+    this.logger.log(`🔍 Scoring ${categoryName} for ${timestamp.toISOString()}`);
+    
+    // 1. Load raw fund data from Collection 2
+    const fundsData = await this.loadFundsData(categoryName, timestamp);
+    
+    // 2. Step 1: Assign points for all funds
+    const fundsPoints = fundsData.map(fund => ({
+      fundId: fund._id.toString(),
+      fundName: fund.Fund_Name,
+      rawValues: fund,
+      points: this.pointsAssignment.assignPoints(fund),
+    }));
+    
+    // 3. Step 2: Calculate category-level statistics
+    const categoryStats = this.categoryStats.calculateCategoryStats(
+      categoryName,
+      fundsPoints,
+    );
+    
+    // 4. Step 3: Calculate Z-scores for all funds
+    const fundsZScores = fundsPoints.map(fund => ({
+      fundId: fund.fundId,
+      fundName: fund.fundName,
+      rawValues: fund.rawValues,
+      points: fund.points,
+      zScores: this.zScoreCalculator.calculateZScores(fund.points, categoryStats),
+    }));
+    
+    // 5. Step 4: Calculate composite scores for ALL risk profiles
+    const riskProfileScores = await this.compositeScorer.calculateAllRiskProfiles(
+      categoryName,
+      fundsZScores,
+    );
+    
+    // 6. Store in Collection 4
+    await this.mfScoresDao.create({
+      timestamp,
+      category_name: categoryName,
+      category_stats: categoryStats,
+      funds_data: fundsZScores,
+      risk_profile_scores: riskProfileScores,
+    });
+    
+    this.logger.log(`✅ Scored ${fundsData.length} funds in ${categoryName}`);
+  }
+}
+```
+
+---
 
 ## Testing Guidelines
 
-### Critical Test Cases:
-1. Category with exactly 3 funds (minimum)
-2. Category with 1 fund (should skip)
-3. Parameter where all funds have same value (stddev=0)
-4. Parameter null for all funds in category
-5. Fund missing 50% of parameters (partial scoring)
+### Critical Test Cases
 
-### Expected Outputs:
-- Z-scores range: typically -3 to +3 (68% of funds within -1 to +1)
-- Group scores range: similar to Z-scores
-- Composite scores: typically 0.5 to 2.0 for top-ranked funds
+1. **Points Assignment:**
+   - Raw value at boundary (e.g., 5Y_CAGR = 15.0% → exactly 10 pts)
+   - Qualitative text variations ("Tier 1" vs "tier 1" vs "TIER 1")
+   - Null/undefined handling
+
+2. **Category Statistics:**
+   - All funds have same points (stdev = 0 → should be set to 1.0)
+   - Only 2 funds in category (minimum for stdev calculation)
+   - One fund missing all parameters
+
+3. **Z-Score Calculation:**
+   - Outlier values (Z-score > 3 or < -3)
+   - Directional adjustment ("lower is better" params)
+   - Null parameter handling
+
+4. **Composite Scoring:**
+   - Verify different scores for different risk profiles
+   - Verify rankings differ by risk profile
+   - Verify top fund for Aggressive ≠ top fund for Safety Seeker
+
+### Expected Outputs
+
+```typescript
+// Example: Large Cap Equity category
+{
+  category_stats: {
+    total_funds: 50,
+    parameters: {
+      '5Y_CAGR': { mean: 7.8, stdev: 1.8 },
+      'Sharpe_3Y': { mean: 8.2, stdev: 1.5 },
+      // ...
+    }
+  },
+  
+  funds_data: [
+    {
+      fund_name: "Nippon India Large Cap",
+      points: { '5Y_CAGR': 10, 'Sharpe_3Y': 10, ... },
+      z_scores: { '5Y_CAGR_zscore': 1.22, 'Sharpe_3Y_zscore': 1.20, ... }
+    }
+    // ...
+  ],
+  
+  risk_profile_scores: [
+    {
+      risk_profile: "Aggressive Explorer",
+      weighted_scores: [
+        { fund_name: "Nippon India Large Cap", composite_score: 87.5, rank: 1 },
+        { fund_name: "ICICI Bluechip", composite_score: 82.1, rank: 3 }
+      ]
+    },
+    {
+      risk_profile: "Safety Seeker",
+      weighted_scores: [
+        { fund_name: "ICICI Bluechip", composite_score: 82.3, rank: 1 },  // Different!
+        { fund_name: "Nippon India Large Cap", composite_score: 79.1, rank: 3 }  // Different!
+      ]
+    }
+  ]
+}
+```
+
+---
 
 ## Common Pitfalls
 
-1. ❌ **DON'T** calculate Z-scores across all funds (must be per category)
-2. ❌ **DON'T** forget directionality (expense ratio as-is will favor expensive funds)
-3. ❌ **DON'T** use population stddev (use sample stddev with ddof=1)
-4. ❌ **DON'T** store Z-scores in Collection 2 (raw data) - they belong in Collection 4 (computed)
+1. ❌ **DON'T** calculate Z-scores from raw values (use POINTS)
+2. ❌ **DON'T** forget qualitative text → points conversion
+3. ❌ **DON'T** store only one composite score per fund (need 4, one per risk profile)
+4. ❌ **DON'T** use the same ranking for all risk profiles
+5. ❌ **DON'T** calculate Z-scores separately for each risk profile (they're universal)
 
-## Collection References
+---
 
-- **Input**: Collection 2 (mf_scheme_data_monthwise) - raw parameters
-- **Output**: Collection 4 (mf_scores) - ranked funds with Z-scores + group scores
-- **Config**: `src/config/directionality.json`, `src/config/weightage.json`
+## Related Files
 
-## Related Files (NestJS)
+- `src/modules/scoring/services/points-assignment.service.ts` (Step 1)
+- `src/modules/scoring/services/category-stats.service.ts` (Step 2)
+- `src/modules/scoring/services/z-score-calculator.service.ts` (Step 3)
+- `src/modules/scoring/services/composite-scorer.service.ts` (Step 4)
+- `src/modules/scoring/schemas/mf-scores.schema.ts` (Collection 4)
+- `src/modules/scoring/weights/risk-profile-weights.ts` (Weight config)
+- `Docs/SCORING_ENGINE_DEEP_DIVE.md` (Complete explanation)
 
-- `src/scoring-engine/z-score-calculator.service.ts`
-- `src/scoring-engine/group-scorer.service.ts`
-- `src/scoring-engine/composite-scorer.service.ts`
-- `src/scoring-engine/ranker.service.ts`
-- `src/schemas/mf-scheme-data-monthwise.schema.ts`
-- `src/schemas/mf-scores.schema.ts`
+---
+
+**Last Updated:** October 9, 2025  
+**Status:** ✅ Corrected with risk-profile-specific scoring

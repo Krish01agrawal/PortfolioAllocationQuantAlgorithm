@@ -164,83 +164,233 @@ db.category_score.createIndex({ "category_name": 1 }, { unique: true })
 
 ### Collection 4: `mf_scores`
 
-**Purpose**: Time-series of ranked/scored funds per category  
+**Purpose**: Time-series of ranked/scored funds per category **FOR ALL RISK PROFILES**  
 **Lifespan**: Grows monthly  
-**Growth**: Medium (12 docs/month = 144/year)  
+**Growth**: Medium (12 docs/month = 144/year, ONE per category per month)  
 
 **Key Fields**:
 ```javascript
 {
   _id: ObjectId,
-  timestamp: ISODate,
-  category_name: String,
+  timestamp: ISODate,  // Month of scoring
+  category_name: String,  // "Large Cap Equity"
   mutual_fund_category_id: ObjectId,  // → Collection 3
-  risk_profile: String,  // "Aggressive Explorer"
   
-  mf_dec_scores: [
+  // =====================================
+  // SECTION 1: Category-Level Statistics
+  // =====================================
+  category_stats: {
+    total_funds: Int,  // e.g., 50 funds in Large Cap
+    parameters: {
+      '5Y_CAGR': { mean: Float, stdev: Float },
+      'Sharpe_3Y': { mean: Float, stdev: Float },
+      // ... all 27 parameters
+    }
+  },
+  
+  // =====================================
+  // SECTION 2: Fund-Level Data (Risk-Agnostic)
+  // =====================================
+  funds_data: [
     {
-      fund_name: String,
       fund_id: ObjectId,  // → Collection 1
-      composite_score: Float,  // 1.56
-      rank: Int,  // 1, 2, 3...
+      fund_name: String,
       
-      group_scores: {
-        returns_growth: Float,
-        risk_adjusted: Float,
-        volatility_drawdown: Float,
-        expense_aum: Float,
-        downside_liquidity: Float,
-        fund_house_mgr: Float,
-        discipline_turnover: Float,
-        esg_forward: Float
+      // Raw values from Morningstar (AS-IS)
+      raw_values: {
+        '5Y_CAGR': Float,        // 18.86
+        'Sharpe_3Y': Float,      // 1.22
+        'Fund_House': String,    // "Tier 1"
+        'Manager_Record': String, // "Excellent"
+        // ... all 27 parameters
       },
       
+      // Points assigned (Step 1)
+      points: {
+        '5Y_CAGR': Int,          // 10 (≥15%)
+        'Sharpe_3Y': Int,        // 10 (≥1.2)
+        'Fund_House': Int,       // 10 ("Tier 1")
+        'Manager_Record': Int,   // 10 ("Excellent")
+        // ... all 27 parameters
+      },
+      
+      // Z-scores (Step 3, SAME across all risk profiles)
       z_scores: {
-        five_year_cagr_equity: Float,
-        sharpe_ratio: Float,
+        '5Y_CAGR_zscore': Float,      // 1.22
+        'Sharpe_3Y_zscore': Float,    // 1.20
+        'Fund_House_zscore': Float,   // 1.55
+        'Manager_Record_zscore': Float, // 1.61
         // ... all 27 parameters
       }
     }
-  ]
+    // ... all funds in category
+  ],
+  
+  // =====================================
+  // SECTION 3: Risk-Profile-Specific Scores (Step 4)
+  // ⚠️ CRITICAL: Different scores & ranks for each risk profile!
+  // =====================================
+  risk_profile_scores: [
+    {
+      risk_profile: "Aggressive Explorer",
+      weighted_scores: [
+        {
+          fund_id: ObjectId,
+          fund_name: "Nippon India Large Cap Fund",
+          composite_score: 87.5,  // High (returns weighted more)
+          rank: 1
+        },
+        {
+          fund_id: ObjectId,
+          fund_name: "ICICI Pru Bluechip Fund",
+          composite_score: 82.1,
+          rank: 3
+        }
+        // ... all funds sorted by composite_score DESC
+      ]
+    },
+    {
+      risk_profile: "Balanced Achiever",
+      weighted_scores: [
+        {
+          fund_id: ObjectId,
+          fund_name: "ICICI Pru Bluechip Fund",  // Different ranking!
+          composite_score: 84.7,
+          rank: 1
+        },
+        {
+          fund_id: ObjectId,
+          fund_name: "Nippon India Large Cap Fund",
+          composite_score: 83.2,
+          rank: 2
+        }
+        // ... all funds sorted by composite_score DESC
+      ]
+    },
+    {
+      risk_profile: "Conservative Guardian",
+      weighted_scores: [ /* ... */ ]
+    },
+    {
+      risk_profile: "Safety Seeker",
+      weighted_scores: [
+        {
+          fund_id: ObjectId,
+          fund_name: "ICICI Pru Bluechip Fund",  // Different top fund!
+          composite_score: 82.3,
+          rank: 1
+        },
+        {
+          fund_id: ObjectId,
+          fund_name: "Axis Bluechip Fund",
+          composite_score: 81.7,
+          rank: 2
+        },
+        {
+          fund_id: ObjectId,
+          fund_name: "Nippon India Large Cap Fund",  // Lower rank
+          composite_score: 79.1,
+          rank: 3
+        }
+        // ... all funds sorted by composite_score DESC
+      ]
+    }
+  ],
+  
+  createdAt: ISODate,
+  processing_time_ms: Int,  // For monitoring
+  status: String  // "completed", "failed"
 }
 ```
 
+**⚠️ Key Insight:**
+- **ONE document per category per month** (not one per risk profile)
+- **Contains scores for ALL 4 risk profiles** in `risk_profile_scores` array
+- **Rankings differ by risk profile** (top fund for Aggressive ≠ top fund for Safety Seeker)
+- **Z-scores are universal** (same across all risk profiles)
+- **Composite scores are risk-specific** (different weights applied)
+
 **Indexes**:
 ```javascript
-// Get latest scores for a category + risk profile
+// Get latest scores for a category
 db.mf_scores.createIndex({ 
   "category_name": 1, 
-  "risk_profile": 1,
   "timestamp": -1 
 })
 
-// Get top-ranked funds quickly
-db.mf_scores.createIndex({ "mf_dec_scores.rank": 1 })
+// Efficient filtering by risk profile
+db.mf_scores.createIndex({ 
+  "risk_profile_scores.risk_profile": 1 
+})
+
+// For fund-level queries
+db.mf_scores.createIndex({ 
+  "funds_data.fund_id": 1,
+  "timestamp": -1
+})
 ```
 
 **Query Patterns**:
 ```javascript
 // Get top 5 Large Cap funds for Balanced Achiever (latest month)
-db.mf_scores.findOne({
-  "category_name": "Large Cap Equity",
-  "risk_profile": "Balanced Achiever",
-  "timestamp": ISODate("2025-10-01")
-}, {
-  "mf_dec_scores": { $slice: 5 }  // Only top 5
-})
-
-// Get historical rank trend for a fund
 db.mf_scores.aggregate([
-  { $match: { "category_name": "Large Cap Equity" } },
-  { $unwind: "$mf_dec_scores" },
-  { $match: { "mf_dec_scores.fund_id": ObjectId("...") } },
+  { $match: { 
+      "category_name": "Large Cap Equity",
+      "timestamp": ISODate("2025-10-01")
+  }},
+  { $unwind: "$risk_profile_scores" },
+  { $match: { 
+      "risk_profile_scores.risk_profile": "Balanced Achiever"
+  }},
+  { $project: {
+      scores: { $slice: ["$risk_profile_scores.weighted_scores", 5] }
+  }}
+])
+
+// Get historical rank trend for a fund (across all risk profiles)
+db.mf_scores.aggregate([
+  { $match: { 
+      "category_name": "Large Cap Equity",
+      "timestamp": { $gte: ISODate("2024-01-01") }
+  }},
+  { $unwind: "$risk_profile_scores" },
+  { $unwind: "$risk_profile_scores.weighted_scores" },
+  { $match: { 
+      "risk_profile_scores.weighted_scores.fund_id": ObjectId("...")
+  }},
   { $project: {
       timestamp: 1,
-      rank: "$mf_dec_scores.rank",
-      score: "$mf_dec_scores.composite_score"
+      risk_profile: "$risk_profile_scores.risk_profile",
+      rank: "$risk_profile_scores.weighted_scores.rank",
+      score: "$risk_profile_scores.weighted_scores.composite_score"
   }},
   { $sort: { timestamp: 1 } }
 ])
+
+// Compare a fund's rank across all risk profiles (current month)
+db.mf_scores.aggregate([
+  { $match: { 
+      "category_name": "Large Cap Equity",
+      "timestamp": ISODate("2025-10-01")
+  }},
+  { $unwind: "$risk_profile_scores" },
+  { $unwind: "$risk_profile_scores.weighted_scores" },
+  { $match: { 
+      "risk_profile_scores.weighted_scores.fund_name": "Nippon India Large Cap Fund"
+  }},
+  { $project: {
+      risk_profile: "$risk_profile_scores.risk_profile",
+      rank: "$risk_profile_scores.weighted_scores.rank",
+      score: "$risk_profile_scores.weighted_scores.composite_score"
+  }}
+])
+// Output:
+// [
+//   { risk_profile: "Aggressive Explorer", rank: 1, score: 87.5 },
+//   { risk_profile: "Balanced Achiever", rank: 2, score: 83.2 },
+//   { risk_profile: "Conservative Guardian", rank: 4, score: 78.9 },
+//   { risk_profile: "Safety Seeker", rank: 3, score: 79.1 }
+// ]
 ```
 
 ## Relationships

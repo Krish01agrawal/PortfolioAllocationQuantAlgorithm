@@ -465,6 +465,7 @@ curl http://localhost:3000/api/mutual-funds/LC001/history | python3 -m json.tool
 - **`Docs/FINAL_ARCHITECTURE.md`** - System architecture  
 - **`Docs/DATA_FLOW_PRODUCTION.md`** - Production data flow
 - **`Docs/MORNINGSTAR_DATA_ANALYSIS.md`** - Data format analysis
+- **`Docs/SCORING_ENGINE_DEEP_DIVE.md`** - Complete scoring engine explanation (4-step process, risk-profile-specific weights)
 
 ### **AI Context**
 - **`.cursor/rules/*.mdc`** - AI context for Phase 2 development
@@ -477,12 +478,15 @@ curl http://localhost:3000/api/mutual-funds/LC001/history | python3 -m json.tool
 ## **🎯 Next Steps (Phase 2)**
 
 ### **Immediate Tasks:**
-1. Build Collection 3: CategoryScore schema
-2. Build Collection 4: MF_Scores schema
-3. Implement Z-Score calculator service
-4. Build qualitative converter (text → numbers in-memory)
-5. Implement composite scorer with risk weighting
-6. Create scoring cron job (runs after data ingestion)
+1. **Build Schemas** - Collections 3 & 4 (with risk_profile_scores array)
+2. **Build DAOs** - Data access layer for scoring collections
+3. **Step 1: Points Assignment Service** - Convert raw values → points (0/3/5/7/10)
+4. **Step 2: Category Stats Service** - Calculate mean & stdev of points
+5. **Step 3: Z-Score Calculator** - Normalize points within category
+6. **Step 4: Composite Scorer** - Apply risk-profile-specific weights (4 scores per fund)
+7. **Build Cron Job** - Orchestrate scoring after data ingestion
+
+**📖 Read first:** `Docs/SCORING_ENGINE_DEEP_DIVE.md` for complete understanding
 
 ### **Future Phases:**
 - **Phase 3:** Portfolio construction & allocation
